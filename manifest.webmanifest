@@ -1,0 +1,19 @@
+{
+  "name": "VB-Factory",
+  "short_name": "VB-Factory",
+  "description": "Suivi des projets d'installation machine : planning, fiches de liaison, réserves et journal de bord.",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f9f9f7",
+  "theme_color": "#3C3489",
+  "categories": ["productivity", "business"],
+  "icons": [
+    { "src": "./assets/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./assets/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./assets/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "./assets/icone.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

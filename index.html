@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VB-Factory rev 10.1.2</title>
+<title>VB-Factory</title>
+<link rel="icon" type="image/svg+xml" href="./assets/icone.svg">
+<link rel="apple-touch-icon" href="./assets/icone-180.png">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#3C3489">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{
@@ -25,7 +29,8 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:var(--text);background:var(--bg2);min-height:100vh;overflow-x:hidden}
 nav{width:var(--nav-w);background:var(--bg);border-right:0.5px solid var(--border2);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow-y:auto}
-.nav-logo{padding:20px 16px 14px;border-bottom:0.5px solid var(--border)}
+.nav-logo{padding:20px 16px 14px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:10px}
+.nav-logo img{width:30px;height:30px;border-radius:8px;flex-shrink:0}
 .nav-logo h1{font-size:15px;font-weight:600}
 .nav-logo .nav-ver{font-size:10px;color:var(--text3);margin-top:2px}
 .nav-links{flex:1;padding:10px 8px;display:flex;flex-direction:column;gap:2px}
@@ -502,7 +507,7 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
 <button id="mobile-save-btn" onclick="manualSave()" title="Sauvegarder">💾</button>
 
 <nav>
-  <div class="nav-logo"><h1>VB-Factory</h1><div class="nav-ver">rev 10.1.2</div></div>
+  <div class="nav-logo"><img src="./assets/icone.svg" alt=""><div><h1>VB-Factory</h1><div class="nav-ver">rev 10.1.2</div></div></div>
   <div class="nav-links">
     <div class="nav-section">Suivi</div>
     <button class="nav-btn active" onclick="showPage('dashboard')" id="nav-dashboard"><span class="nav-icon">📊</span><span>Tableau de bord</span></button>
@@ -5718,8 +5723,9 @@ function generateFLPDF() {
 <div id="vb-login-screen" style="position:fixed;inset:0;background:#f9f9f7;z-index:99999;display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif">
   <div style="background:white;border-radius:16px;padding:40px 32px;width:340px;max-width:90vw;box-shadow:0 10px 40px rgba(0,0,0,0.1)">
     <div style="text-align:center;margin-bottom:28px">
+      <img src="./assets/icone.svg" alt="" width="68" height="68" style="display:block;margin:0 auto 14px;border-radius:16px">
       <div style="font-size:22px;font-weight:800;letter-spacing:-0.5px">Vernet <span style="color:#9333ea">Behringer</span></div>
-      <div style="font-size:13px;color:#888;margin-top:4px">VB Factory</div>
+      <div style="font-size:13px;color:#888;margin-top:4px">VB-Factory</div>
     </div>
     <div id="vb-login-error" style="display:none;background:#fee2e2;color:#991b1b;padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:16px"></div>
     <button onclick="vbDriveConnect()" id="vb-login-btn"
