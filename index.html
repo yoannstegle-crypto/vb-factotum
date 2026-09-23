@@ -513,6 +513,7 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
     <button class="nav-btn active" onclick="showPage('dashboard')" id="nav-dashboard"><span class="nav-icon">📊</span><span>Tableau de bord</span></button>
     <button class="nav-btn" onclick="showPage('timeline')" id="nav-timeline"><span class="nav-icon">📅</span><span>Timeline</span></button>
     <button class="nav-btn" onclick="showPage('projects')" id="nav-projects"><span class="nav-icon">📁</span><span>Projets</span></button>
+    <button class="nav-btn" onclick="vbAssistantOpen()" id="nav-assistant"><span class="nav-icon">🤖</span><span>Assistant</span></button>
     <div class="nav-section">Gestion</div>
     <button class="nav-btn" onclick="showPage('new-project')" id="nav-new-project"><span class="nav-icon">➕</span><span>Nouveau projet</span></button>
     <button class="nav-btn" onclick="showPage('config')" id="nav-config"><span class="nav-icon">⚙️</span><span>Configuration</span></button>
@@ -882,6 +883,29 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
       <div class="config-section-title">🏷️ Nom de l'application</div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Nom affiché</label><input type="text" class="form-input" id="cfg-app-name" maxlength="40"></div>
+      </div>
+    </div>
+    <div class="config-section">
+      <div class="config-section-title">🤖 Assistant IA</div>
+      <div style="font-size:12px;color:var(--text2,#666);margin-bottom:10px;line-height:1.55">
+        L'assistant répond à partir de vos données réelles — retards, jalons, paiements, réserves — calculées par l'application.
+        La clé reste <b>sur cet appareil</b> et n'est jamais enregistrée dans votre Drive : il faut donc la saisir sur chaque appareil.
+        Elle se crée gratuitement sur <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>.
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Clé API Gemini</label>
+          <input type="password" class="form-input" id="cfg-gemini-key" placeholder="AIza…" autocomplete="off"></div>
+      </div>
+      <div style="margin-top:14px">
+        <div style="font-size:12px;font-weight:600;margin-bottom:4px">🧠 Ce que l'assistant a retenu</div>
+        <div id="cfg-memoire-list"></div>
+      </div>
+      <div style="margin-top:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <div style="font-size:12px;font-weight:600">💡 Idées d'évolution</div>
+          <button class="btn btn-sm" style="margin-left:auto" onclick="vbCopyIdees()">Copier la liste</button>
+        </div>
+        <div id="cfg-idees-list"></div>
       </div>
     </div>
     <div class="config-section">
@@ -3287,6 +3311,8 @@ function saveProject(){
 // ── CONFIG ──
 function initConfigPage(){
   document.getElementById('cfg-app-name').value=config.appName||'VB-Factory';
+  document.getElementById('cfg-gemini-key').value=vbGeminiKey();
+  vbRenderAssistantLists();
   document.getElementById('cfg-target-gap').value=config.targetGapDays;
   document.getElementById('cfg-alert-threshold').value=config.alertThreshold;
   renderPhasesList();renderTemplatesList();
@@ -3303,7 +3329,7 @@ function renderTemplatesList(){const el=document.getElementById('templates-list'
   el.innerHTML=tpls.map((t,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg2);border-radius:6px;margin-bottom:8px"><span style="flex:1;font-size:13px;font-weight:500">${vbEsc(t.name)}</span><span style="font-size:11px;color:var(--text3)">${t.tasks.length} tâches</span><button class="btn btn-sm btn-danger" onclick="deleteTemplate(${i})">🗑</button></div>`).join('');}
 function addNewTemplate(){if(!config.templates)config.templates=JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));config.templates.push({id:'tpl_'+Date.now(),name:'Nouveau template',tasks:[]});renderTemplatesList();}
 function deleteTemplate(i){if(!confirm('Supprimer ?'))return;getTemplates().splice(i,1);renderTemplatesList();}
-function saveConfigPage(){config.appName=(document.getElementById('cfg-app-name').value||'').trim()||'VB-Factory';config.targetGapDays=parseInt(document.getElementById('cfg-target-gap').value)||5;config.alertThreshold=parseInt(document.getElementById('cfg-alert-threshold').value)||70;localStorage.setItem('kropp_config_v3',JSON.stringify(config));vbApplyAppName();if(typeof vbMarkDirty==='function')vbMarkDirty();showNotification('✅ Configuration enregistrée');showPage('dashboard');}
+function saveConfigPage(){vbGeminiSetKey(document.getElementById('cfg-gemini-key').value);config.appName=(document.getElementById('cfg-app-name').value||'').trim()||'VB-Factory';config.targetGapDays=parseInt(document.getElementById('cfg-target-gap').value)||5;config.alertThreshold=parseInt(document.getElementById('cfg-alert-threshold').value)||70;localStorage.setItem('kropp_config_v3',JSON.stringify(config));vbApplyAppName();if(typeof vbMarkDirty==='function')vbMarkDirty();showNotification('✅ Configuration enregistrée');showPage('dashboard');}
 
 // ── EXPORT ──
 function initExportPage(){
@@ -4508,6 +4534,330 @@ function renderFLEtape3New(p){
   document.getElementById('fl-content').innerHTML=html;
 }
 
+
+// ================================================================
+// ASSISTANT IA (Gemini)
+// ================================================================
+// La clé reste dans le navigateur et n'entre JAMAIS dans le document Drive :
+// celui-ci se synchronise entre appareils, une clé d'API n'a rien à y faire.
+// Principe directeur : le modèle ne calcule rien. Retards, échéances et
+// montants sont produits par vpBuildAlerts() ; il ne fait que hiérarchiser et
+// formuler. Un modèle à qui on demande de compter des jours se trompe.
+
+const VB_GEMINI_ROOT = 'https://generativelanguage.googleapis.com/v1beta/models';
+const VB_GEMINI_MODEL = 'gemini-2.5-flash';
+const VB_GEMINI_KEY_STORAGE = 'vb_gemini_key';
+const VB_ASSISTANT_MAX_ALERTS = 60;   // au-delà, le contexte coûte cher sans rien apporter
+const VB_ASSISTANT_MAX_RESERVES = 40;
+const VB_ASSISTANT_MAX_MEMOIRE = 60;
+
+function vbGeminiKey(){ try{ return localStorage.getItem(VB_GEMINI_KEY_STORAGE) || ''; }catch(e){ return ''; } }
+function vbGeminiSetKey(k){ try{ localStorage.setItem(VB_GEMINI_KEY_STORAGE, (k||'').trim()); }catch(e){} }
+function vbGeminiReady(){ return !!vbGeminiKey(); }
+
+async function vbGeminiCall({ prompt, schema, history }){
+  const cle = vbGeminiKey();
+  if(!cle) throw new Error("Aucune clé Gemini enregistrée. Ouvrez Configuration pour l'ajouter.");
+
+  const contents = [];
+  (history || []).forEach(m => contents.push({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
+  contents.push({ role: 'user', parts: [{ text: prompt }] });
+
+  const corps = { contents, generationConfig: { temperature: 0.2 } };
+  if(schema){
+    corps.generationConfig.responseMimeType = 'application/json';
+    corps.generationConfig.responseSchema = schema;
+  }
+
+  let rep;
+  try{
+    rep = await fetch(VB_GEMINI_ROOT + '/' + encodeURIComponent(VB_GEMINI_MODEL) + ':generateContent?key=' + encodeURIComponent(cle), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps)
+    });
+  }catch(e){
+    throw new Error('Connexion impossible. Vérifiez le réseau et réessayez.');
+  }
+
+  if(!rep.ok){
+    const detail = await rep.text().catch(() => '');
+    let msg = 'Erreur Gemini ' + rep.status;
+    try{ const j = JSON.parse(detail); if(j.error && j.error.message) msg = j.error.message; }catch(e){}
+    if(rep.status === 400 && /API key/i.test(msg)) msg = 'Clé Gemini refusée. Vérifiez-la dans Configuration.';
+    if(rep.status === 429) msg = 'Quota Gemini atteint. Réessayez dans quelques minutes.';
+    throw new Error(msg);
+  }
+
+  const json = await rep.json();
+  const texte = (json.candidates || [])
+    .flatMap(c => (c.content && c.content.parts) || [])
+    .map(p => p.text || '').join('');
+  if(!texte.trim()) throw new Error("L'assistant n'a rien renvoyé. Reformulez votre question.");
+  if(!schema) return texte;
+  try{ return JSON.parse(texte); }
+  catch(e){ throw new Error("Réponse illisible de l'assistant."); }
+}
+
+// ─── Les faits, calculés par l'application ───
+function vbAssistantFacts(){
+  const today = new Date();
+  const alerts = (typeof vpBuildAlerts === 'function' ? vpBuildAlerts() : []) || [];
+  const risques = (typeof vpBuildRiskProjects === 'function' ? vpBuildRiskProjects(alerts) : []) || [];
+
+  const ligneAlerte = a => ({
+    projet: a.project,
+    tache: a.task,
+    responsable: a.who || null,
+    categorie: a.cat,
+    type: a.type,                                  // late | soon | payment | quality
+    jours: a.days,                                 // négatif = en retard
+    echeance: a.days < 0 ? 'dépassée de ' + Math.abs(a.days) + ' j' : 'dans ' + a.days + ' j'
+  });
+
+  // Réserves ouvertes : dépassées, ou dont l'échéance tombe dans les 45 jours
+  const reserves = [];
+  (projects || []).filter(p => p.status !== 'cloture').forEach(p => {
+    (p.reserves || []).forEach(r => {
+      if(typeof vbResIsClosed === 'function' && vbResIsClosed(r)) return;
+      if(!r.echeance) return;
+      const j = Math.round((new Date(r.echeance) - today) / 86400000);
+      if(j > 45) return;
+      reserves.push({
+        projet: p.name,
+        description: (r.description || '').slice(0, 180),
+        responsable: r.responsable || null,
+        echeance: j < 0 ? 'dépassée de ' + Math.abs(j) + ' j' : 'dans ' + j + ' j',
+        jours: j
+      });
+    });
+  });
+  reserves.sort((a, b) => a.jours - b.jours);
+
+  return {
+    date_du_jour: today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+    semaine_iso: (typeof vbIsoWeekNumber === 'function' ? vbIsoWeekNumber(today) : null),
+    projets_actifs: (projects || []).filter(p => p.status !== 'cloture').length,
+    en_retard: alerts.filter(a => a.type === 'late').slice(0, VB_ASSISTANT_MAX_ALERTS).map(ligneAlerte),
+    a_venir_7j: alerts.filter(a => a.type === 'soon').slice(0, VB_ASSISTANT_MAX_ALERTS).map(ligneAlerte),
+    paiements: alerts.filter(a => a.type === 'payment').slice(0, VB_ASSISTANT_MAX_ALERTS).map(ligneAlerte),
+    donnees_a_corriger: alerts.filter(a => a.type === 'quality').slice(0, 20).map(ligneAlerte),
+    projets_a_risque: risques.slice(0, 8).map(r => ({ projet: r.name, score: r.score, motifs: vpRiskReasons(r) })),
+    reserves_ouvertes: reserves.slice(0, VB_ASSISTANT_MAX_RESERVES),
+    memoire: (config.assistantMemoire || []).slice(-VB_ASSISTANT_MAX_MEMOIRE)
+  };
+}
+
+const VB_ASSISTANT_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    reponse: { type: 'STRING', description: "Réponse à l'utilisateur, en français, concise et directement actionnable." },
+    memoire: {
+      type: 'ARRAY',
+      description: "Précisions DURABLES données par l'utilisateur et absentes des données (report accordé, attente client, tâche déjà faite). Vide si rien de tel.",
+      items: { type: 'STRING' }
+    },
+    idees: {
+      type: 'ARRAY',
+      description: "Souhaits d'évolution de l'application exprimés par l'utilisateur. Vide s'il n'en exprime aucun.",
+      items: { type: 'STRING' }
+    }
+  },
+  required: ['reponse']
+};
+
+function vbAssistantPrompt(question){
+  const faits = vbAssistantFacts();
+  return `Tu es l'assistant de suivi de VB-Factory, outil de pilotage de projets d'installation de machines industrielles chez Vernet Behringer. Tu assistes le chargé d'affaires.
+
+Voici l'état réel de ses projets, calculé par l'application. Ces chiffres sont exacts :
+
+${JSON.stringify(faits, null, 1)}
+
+Règles impératives :
+- N'invente aucune date, aucun montant, aucun nom de projet. Utilise EXCLUSIVEMENT ce qui figure ci-dessus.
+- Ne recalcule pas les délais : les champs "echeance" et "jours" sont déjà justes, reprends-les tels quels.
+- Priorise : ce qui est en retard et les paiements passent avant le reste.
+- Sois bref et concret. Des puces, pas de paragraphes. Nomme toujours le projet concerné.
+- Si une information demandée n'est pas dans les données, dis-le franchement plutôt que de supposer.
+- La section "memoire" contient ce que l'utilisateur t'a précisé auparavant : tiens-en compte, elle prime sur les données brutes.
+- Si l'utilisateur t'apprend un fait durable (report accordé, attente d'un client, tâche déjà réalisée), reporte-le dans le champ "memoire".
+- S'il exprime un souhait d'évolution de l'application elle-même, reporte-le dans le champ "idees".
+
+Question : ${question}`;
+}
+
+// ─── Persistance (config voyage dans le document Drive) ───
+function vbSaveConfig(){
+  try{ localStorage.setItem('kropp_config_v3', JSON.stringify(config)); }
+  catch(e){ vbShowStorageFailureWarning('kropp_config_v3', e); }
+  if(typeof vbMarkDirty === 'function') vbMarkDirty();
+}
+
+let vbAssistantHistory = [];   // volatile : le fil repart à zéro à chaque session
+let vbAssistantBusy = false;
+
+function vbAssistantOpen(){
+  let panel = document.getElementById('vb-assistant-panel');
+  if(!panel){
+    panel = document.createElement('div');
+    panel.id = 'vb-assistant-panel';
+    panel.style.cssText = 'position:fixed;top:0;right:0;bottom:0;width:420px;max-width:100vw;background:#fff;z-index:9600;'
+      + 'box-shadow:-4px 0 24px rgba(0,0,0,0.14);display:flex;flex-direction:column;font-family:inherit';
+    panel.innerHTML =
+      '<div style="padding:14px 16px;border-bottom:1px solid var(--border,#e8e8e5);display:flex;align-items:center;gap:10px">'
+      + '<img src="./assets/icone.svg" alt="" style="width:26px;height:26px;border-radius:7px">'
+      + '<div style="flex:1"><div style="font-weight:700;font-size:14px">Assistant</div>'
+      + '<div style="font-size:11px;color:var(--text3,#999)">Adossé à vos données réelles</div></div>'
+      + '<button onclick="vbAssistantClose()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;padding:2px 6px">✕</button>'
+      + '</div>'
+      + '<div id="vb-assistant-quick" style="padding:10px 16px;border-bottom:1px solid var(--border,#e8e8e5);display:flex;gap:6px;flex-wrap:wrap">'
+      + '<button class="btn btn-sm" onclick="vbAssistantAsk(\'Que dois-je absolument faire aujourd\\u2019hui ?\')">Aujourd’hui</button>'
+      + '<button class="btn btn-sm" onclick="vbAssistantAsk(\'Que dois-je faire cette semaine ?\')">Cette semaine</button>'
+      + '<button class="btn btn-sm" onclick="vbAssistantAsk(\'Quelles sont mes priorités de ce mois ?\')">Ce mois</button>'
+      + '</div>'
+      + '<div id="vb-assistant-messages" style="flex:1;overflow-y:auto;padding:16px;font-size:13px;line-height:1.55"></div>'
+      + '<div style="padding:12px 16px;border-top:1px solid var(--border,#e8e8e5)">'
+      + '<div style="display:flex;gap:8px;align-items:flex-end">'
+      + '<textarea id="vb-assistant-input" rows="2" placeholder="Posez votre question…" '
+      + 'style="flex:1;resize:none;padding:9px 11px;border:1px solid var(--border,#e8e8e5);border-radius:8px;font:inherit;font-size:13px;box-sizing:border-box" '
+      + 'onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();vbAssistantSend()}"></textarea>'
+      + '<button class="btn btn-primary" onclick="vbAssistantSend()" style="padding:9px 14px">Envoyer</button>'
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--text3,#aaa);margin-top:7px">Entrée pour envoyer · Maj+Entrée pour aller à la ligne</div>'
+      + '</div>';
+    document.body.appendChild(panel);
+    if(!vbAssistantHistory.length) vbAssistantWelcome();
+  }
+  panel.style.display = 'flex';
+  const inp = document.getElementById('vb-assistant-input');
+  if(inp) inp.focus();
+}
+
+function vbAssistantClose(){
+  const p = document.getElementById('vb-assistant-panel');
+  if(p) p.style.display = 'none';
+}
+
+function vbAssistantWelcome(){
+  if(!vbGeminiReady()){
+    vbAssistantPush('assistant',
+      "Pour m'utiliser, ajoutez une clé Gemini dans Configuration → Assistant IA. "
+      + "Elle reste sur cet appareil et n'est jamais envoyée dans votre Drive.");
+    return;
+  }
+  const n = (projects || []).filter(p => p.status !== 'cloture').length;
+  vbAssistantPush('assistant', 'Bonjour. Vous suivez ' + n + ' projet(s) actif(s). Demandez-moi ce qui est prioritaire, ou utilisez les raccourcis ci-dessus.');
+}
+
+function vbAssistantPush(role, texte){
+  vbAssistantHistory.push({ role, text: texte });
+  vbAssistantRender();
+}
+
+function vbAssistantRender(){
+  const box = document.getElementById('vb-assistant-messages');
+  if(!box) return;
+  box.innerHTML = vbAssistantHistory.map(m => {
+    const corps = vbEsc(m.text).replace(/\n/g, '<br>');
+    if(m.role === 'user'){
+      return '<div style="margin-bottom:14px;text-align:right"><div style="display:inline-block;background:var(--purple-600,#534AB7);color:#fff;'
+        + 'padding:9px 12px;border-radius:12px 12px 3px 12px;max-width:85%;text-align:left">' + corps + '</div></div>';
+    }
+    return '<div style="margin-bottom:14px"><div style="display:inline-block;background:#f4f3f9;padding:9px 12px;'
+      + 'border-radius:12px 12px 12px 3px;max-width:92%">' + corps + '</div></div>';
+  }).join('');
+  if(vbAssistantBusy){
+    box.innerHTML += '<div style="color:var(--text3,#999);font-size:12px;font-style:italic">L’assistant réfléchit…</div>';
+  }
+  box.scrollTop = box.scrollHeight;
+}
+
+function vbAssistantSend(){
+  const inp = document.getElementById('vb-assistant-input');
+  if(!inp) return;
+  const q = inp.value.trim();
+  if(!q) return;
+  inp.value = '';
+  vbAssistantAsk(q);
+}
+
+async function vbAssistantAsk(question){
+  if(vbAssistantBusy) return;
+  vbAssistantOpen();
+  vbAssistantPush('user', question);
+  if(!vbGeminiReady()){
+    vbAssistantPush('assistant', "Aucune clé Gemini enregistrée. Ajoutez-la dans Configuration → Assistant IA.");
+    return;
+  }
+  vbAssistantBusy = true;
+  vbAssistantRender();
+  try{
+    // L'historique transmis exclut le dernier message : il part dans le prompt,
+    // accompagné des faits à jour.
+    const hist = vbAssistantHistory.slice(0, -1).slice(-8);
+    const res = await vbGeminiCall({
+      prompt: vbAssistantPrompt(question),
+      schema: VB_ASSISTANT_SCHEMA,
+      history: hist
+    });
+    vbAssistantBusy = false;
+    vbAssistantPush('assistant', res.reponse || '(réponse vide)');
+
+    let touche = false;
+    if(Array.isArray(res.memoire) && res.memoire.length){
+      config.assistantMemoire = (config.assistantMemoire || []).concat(
+        res.memoire.map(t => ({ date: new Date().toISOString().slice(0, 10), texte: String(t) })));
+      touche = true;
+      showNotification('🧠 ' + res.memoire.length + ' précision(s) retenue(s)');
+    }
+    if(Array.isArray(res.idees) && res.idees.length){
+      config.idees = (config.idees || []).concat(
+        res.idees.map(t => ({ date: new Date().toISOString().slice(0, 10), texte: String(t) })));
+      touche = true;
+      showNotification('💡 ' + res.idees.length + ' idée(s) notée(s)');
+    }
+    if(touche) vbSaveConfig();
+  }catch(e){
+    vbAssistantBusy = false;
+    vbAssistantPush('assistant', '⚠️ ' + e.message);
+  }
+}
+
+// ─── Mémoire et idées : consultation et retrait ───
+function vbRenderAssistantLists(){
+  const mem = document.getElementById('cfg-memoire-list');
+  if(mem){
+    const items = config.assistantMemoire || [];
+    mem.innerHTML = items.length
+      ? items.map((m, i) => '<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #f0f0ee">'
+          + '<div style="flex:1;font-size:12px"><span style="color:var(--text3,#999)">' + vbEsc(m.date) + '</span> — ' + vbEsc(m.texte) + '</div>'
+          + '<button class="btn btn-sm" onclick="vbForgetMemoire(' + i + ')" title="Oublier">✕</button></div>').join('')
+      : '<div style="font-size:12px;color:var(--text3,#999)">Rien de mémorisé pour l’instant.</div>';
+  }
+  const idl = document.getElementById('cfg-idees-list');
+  if(idl){
+    const items = config.idees || [];
+    idl.innerHTML = items.length
+      ? items.map((m, i) => '<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #f0f0ee">'
+          + '<div style="flex:1;font-size:12px"><span style="color:var(--text3,#999)">' + vbEsc(m.date) + '</span> — ' + vbEsc(m.texte) + '</div>'
+          + '<button class="btn btn-sm" onclick="vbRemoveIdee(' + i + ')" title="Retirer">✕</button></div>').join('')
+      : '<div style="font-size:12px;color:var(--text3,#999)">Aucune idée notée.</div>';
+  }
+}
+
+function vbForgetMemoire(i){
+  (config.assistantMemoire || []).splice(i, 1);
+  vbSaveConfig(); vbRenderAssistantLists();
+}
+function vbRemoveIdee(i){
+  (config.idees || []).splice(i, 1);
+  vbSaveConfig(); vbRenderAssistantLists();
+}
+function vbCopyIdees(){
+  const t = (config.idees || []).map(m => '- [' + m.date + '] ' + m.texte).join('\n');
+  if(!t){ showNotification('Aucune idée à copier'); return; }
+  navigator.clipboard.writeText(t).then(() => showNotification('💡 Idées copiées'),
+    () => showNotification('Copie impossible'));
+}
 
 // ================================================================
 // MODULE IMPORT FICHE TECHNIQUE (.xlsx)
