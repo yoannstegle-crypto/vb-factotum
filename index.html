@@ -4975,6 +4975,7 @@ let vbAssistantHistory = [];   // volatile : le fil repart à zéro à chaque se
 let vbAssistantBusy = false;
 let vbAssistantAbandon = false;
 let vbAssistantDerniereQuestion = '';
+let vbAssistantDernierTexte = '';   // la phrase du modèle : elle cite souvent la date
 
 function vbAssistantOpen(){
   let panel = document.getElementById('vb-assistant-panel');
@@ -5097,6 +5098,7 @@ async function vbAssistantAsk(question){
     });
     if(vbAssistantAbandon) return;   // l'utilisateur est passé à autre chose
     vbAssistantBusy = false;
+    vbAssistantDernierTexte = res.reponse || '';
     vbAssistantPush('assistant', res.reponse || '(réponse vide)');
     if(Array.isArray(res.actions) && res.actions.length) vbAssistantProposer(res.actions);
 
@@ -5155,6 +5157,29 @@ function vbDateNorm(v){
   return null;
 }
 
+// Toutes les dates d'un texte, dans l'ordre d'apparition, ISO ou françaises.
+function vbDatesDepuisTexte(txt){
+  const out = [];
+  const re = /(\d{4}-\d{2}-\d{2})|(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})/g;
+  let m;
+  while((m = re.exec(String(txt || ''))) !== null){
+    out.push(m[1] ? m[1] : m[4] + '-' + String(m[3]).padStart(2, '0') + '-' + String(m[2]).padStart(2, '0'));
+  }
+  return out.filter((v, i) => out.indexOf(v) === i);
+}
+
+// Dernier recours quand le modèle n'a rempli aucun champ de date : sa propre phrase et
+// celle de l'utilisateur la contiennent presque toujours.
+function vbDatesDeSecours(a, texte){
+  const txt = [texte, vbAssistantDerniereQuestion, a.libelle, a.nom].map(x => String(x || '')).join(' ');
+  const dates = vbDatesDepuisTexte(txt);
+  if(!dates.length) return { d: null, f: null };
+  if(dates.length >= 2) return { d: dates[0], f: dates[1] };
+  // Une seule date : « fin » sans « début » la désigne comme une fin.
+  const finSeule = /\bfin\b/i.test(txt) && !/\bd[ée]but\b|\bdemarr|\bdémarr|\bcommenc/i.test(txt);
+  return finSeule ? { d: null, f: dates[0] } : { d: dates[0], f: null };
+}
+
 function vbDateProposee(a, cles){
   for(const c of cles){
     const v = vbDateNorm(a[c]);
@@ -5203,11 +5228,11 @@ function vbResoudreTache(p, a){
 // Saisie directe d'une date de réalisation quand le modèle ne l'a pas fournie.
 // Deux champs : une intervention a une durée. N'en proposer qu'un conduisait à écrire la
 // même date des deux côtés, ce qui écrase l'information utile.
-function vbCarteSaisieDate(p, ti, titre){
+function vbCarteSaisieDate(p, ti, titre, preD, preF){
   const idx = vbAssistantActions.push({ type: 'date_reelle', projectId: p.id, ti, debut: null, fin: null }) - 1;
   const t = (p.tasks || [])[ti] || {};
   const ponctuel = (Number(t.duration) === 0) || (t.start_date && t.start_date === t.end_date);
-  const jour = new Date().toISOString().slice(0, 10);
+  const jour = preD || preF || new Date().toISOString().slice(0, 10);
   const champ = (suffixe, etiquette, valeur) =>
     '<label style="display:flex;align-items:center;gap:7px;margin-top:5px;font-size:12px">'
     + '<span style="width:44px;color:var(--text2,#666)">' + etiquette + '</span>'
@@ -5215,8 +5240,8 @@ function vbCarteSaisieDate(p, ti, titre){
     + 'style="padding:6px 9px;border:1px solid var(--border,#e8e8e5);border-radius:7px;font:inherit;font-size:13px"></label>';
   return '<div id="vb-act-' + idx + '" style="border:1px solid #fcd34d;background:#fffbeb;border-radius:10px;padding:11px 13px;margin-top:8px">'
     + '<div style="font-weight:700;font-size:12px;margin-bottom:3px">📅 ' + titre + '</div>'
-    + champ('debut', 'Début', t.actual_start || jour)
-    + (ponctuel ? '' : champ('fin', 'Fin', t.actual_end || ''))
+    + champ('debut', 'Début', preD || t.actual_start || jour)
+    + (ponctuel ? '' : champ('fin', 'Fin', preF || t.actual_end || ''))
     + '<div style="display:flex;gap:6px;margin-top:10px">'
     + '<button class="btn btn-primary btn-sm" onclick="vbAssistantSaisirDate(' + idx + ')">Enregistrer</button>'
     + '<button class="btn btn-sm" onclick="vbAssistantAnnuler(' + idx + ')">Annuler</button>'
@@ -5315,8 +5340,12 @@ function vbAssistantProposer(actions){
       let d = vbDateNorm(a.date_reelle_debut);
       let f = vbDateNorm(a.date_reelle_fin);
       if(!d && !f){
-        const seule = vbDateProposee(a, ['nouvelle_date', 'date_debut']);
+        const seule = vbDateProposee(a, ['nouvelle_date', 'date_debut', 'date', 'debut']);
         if(seule){ d = seule; }
+        else {
+          const s = vbDatesDeSecours(a, vbAssistantDernierTexte);
+          d = s.d; f = s.f;
+        }
       }
       const ponctuel = (Number(t.duration) === 0) || (t.start_date && t.start_date === t.end_date);
       if(ponctuel){ d = d || f; f = f || d; }
@@ -5325,7 +5354,7 @@ function vbAssistantProposer(actions){
 
       if(!d && !f){
         // La date manque vraiment : on la demande plutôt que de renvoyer une erreur sèche.
-        cartes.push({ choix: vbCarteSaisieDate(p, ti, 'Quelle date de réalisation pour « ' + vbEsc(t.name || 'cette tâche') + '  » ?') });
+        cartes.push({ choix: vbCarteSaisieDate(p, ti, 'Quelle date de réalisation pour « ' + vbEsc(t.name || 'cette tâche') + ' » ?', null, null) });
         return;
       }
 
