@@ -4953,7 +4953,10 @@ Modifications de planning :
 Réalisé et création :
 - Quand il t'annonce qu'une chose A EU LIEU — « le client a payé », « l'installation est terminée », « la FAT a été faite hier » — c'est une date RÉELLE : produis une action "date_reelle", jamais "date". Décaler le prévisionnel effacerait ce qui était planifié.
 - « ce jour », « aujourd'hui » désignent la date du champ "date_iso" ci-dessus.
-- Pour un événement ponctuel (paiement, jalon), renseigne la même valeur en début et en fin.
+- Renseigne les dates au format AAAA-MM-JJ, jamais en JJ/MM/AAAA.
+- Début et fin sont deux champs distincts. S'il donne les deux — « du 21/09 au 01/10 » — remplis les deux ; s'il n'en donne qu'un, ne remplis que celui-là et laisse l'autre vide, au lieu d'y recopier le premier : une intervention de dix jours ne se résume pas à une date unique.
+- Pour un événement ponctuel (paiement, jalon), et pour lui seul, renseigne la même valeur en début et en fin.
+- Une année à trois chiffres est une faute de frappe : corrige-la d'après le contexte (« 01/10/226 » vaut 2026-10-01).
 - Quand il demande d'ajouter une tâche ou un jalon — « rajoute un jalon de paiement », « ajoute une formation » — produis une action "ajout_tache" avec le nom, la catégorie, la date de début et la durée (0 pour un jalon). Un acompte ou un paiement relève de la catégorie "payment", et le responsable est le client.
 - Ces opérations sont possibles : ne réponds jamais que tu ne peux pas modifier les données. Tu proposes, l'utilisateur valide.
 - Dans "reponse", annonce ce que tu proposes ; c'est lui qui validera.
@@ -5142,10 +5145,20 @@ function vbFindProjet(id){ return (projects || []).find(p => String(p.id) === St
 // Le modèle confond volontiers les champs de date voisins — il écrit la date dans
 // "nouvelle_date" pour une création, ou la laisse dans le libellé. Refuser pour cette
 // raison serait absurde : la date est là, il suffit d'aller la chercher.
+// Une date peut arriver en ISO ou à la française, y compris dans un champ censé être en
+// ISO : le modèle recopie volontiers la forme employée par l'utilisateur.
+function vbDateNorm(v){
+  const s = String(v || '').trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const fr = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+  if(fr) return fr[3] + '-' + String(fr[2]).padStart(2, '0') + '-' + String(fr[1]).padStart(2, '0');
+  return null;
+}
+
 function vbDateProposee(a, cles){
   for(const c of cles){
-    const v = String(a[c] || '').trim();
-    if(/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+    const v = vbDateNorm(a[c]);
+    if(v) return v;
   }
   const texte = [a.libelle, a.nom, a.reponse].map(x => String(x || '')).join(' ');
   const iso = texte.match(/\d{4}-\d{2}-\d{2}/);
@@ -5188,26 +5201,38 @@ function vbResoudreTache(p, a){
 }
 
 // Saisie directe d'une date de réalisation quand le modèle ne l'a pas fournie.
+// Deux champs : une intervention a une durée. N'en proposer qu'un conduisait à écrire la
+// même date des deux côtés, ce qui écrase l'information utile.
 function vbCarteSaisieDate(p, ti, titre){
   const idx = vbAssistantActions.push({ type: 'date_reelle', projectId: p.id, ti, debut: null, fin: null }) - 1;
+  const t = (p.tasks || [])[ti] || {};
+  const ponctuel = (Number(t.duration) === 0) || (t.start_date && t.start_date === t.end_date);
   const jour = new Date().toISOString().slice(0, 10);
+  const champ = (suffixe, etiquette, valeur) =>
+    '<label style="display:flex;align-items:center;gap:7px;margin-top:5px;font-size:12px">'
+    + '<span style="width:44px;color:var(--text2,#666)">' + etiquette + '</span>'
+    + '<input type="date" id="vb-act-' + suffixe + '-' + idx + '" value="' + valeur + '" '
+    + 'style="padding:6px 9px;border:1px solid var(--border,#e8e8e5);border-radius:7px;font:inherit;font-size:13px"></label>';
   return '<div id="vb-act-' + idx + '" style="border:1px solid #fcd34d;background:#fffbeb;border-radius:10px;padding:11px 13px;margin-top:8px">'
-    + '<div style="font-weight:700;font-size:12px;margin-bottom:7px">📅 ' + titre + '</div>'
-    + '<input type="date" id="vb-act-date-' + idx + '" value="' + jour + '" '
-    + 'style="padding:7px 9px;border:1px solid var(--border,#e8e8e5);border-radius:7px;font:inherit;font-size:13px">'
-    + '<div style="display:flex;gap:6px;margin-top:9px">'
+    + '<div style="font-weight:700;font-size:12px;margin-bottom:3px">📅 ' + titre + '</div>'
+    + champ('debut', 'Début', t.actual_start || jour)
+    + (ponctuel ? '' : champ('fin', 'Fin', t.actual_end || ''))
+    + '<div style="display:flex;gap:6px;margin-top:10px">'
     + '<button class="btn btn-primary btn-sm" onclick="vbAssistantSaisirDate(' + idx + ')">Enregistrer</button>'
     + '<button class="btn btn-sm" onclick="vbAssistantAnnuler(' + idx + ')">Annuler</button>'
     + '</div></div>';
 }
 
 function vbAssistantSaisirDate(idx){
-  const champ = document.getElementById('vb-act-date-' + idx);
-  const v = champ && champ.value;
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(v || '')){ showNotification('⚠️ Choisissez une date'); return; }
   const a = vbAssistantActions[idx];
   if(!a) return;
-  a.debut = v; a.fin = v;
+  const cd = document.getElementById('vb-act-debut-' + idx);
+  const cf = document.getElementById('vb-act-fin-' + idx);
+  const d = cd && vbDateNorm(cd.value);
+  const f = cf ? vbDateNorm(cf.value) : d;   // pas de champ fin = jalon ponctuel
+  if(!d && !f){ showNotification('⚠️ Choisissez au moins une date'); return; }
+  if(d && f && f < d){ showNotification('⚠️ La fin précède le début'); return; }
+  a.debut = d; a.fin = f || (cf ? null : d);
   vbAssistantAppliquer(idx);
 }
 
@@ -5284,17 +5309,33 @@ function vbAssistantProposer(actions){
         return;
       }
       const t = p.tasks[ti];
-      const d = vbDateProposee(a, ['date_reelle_debut', 'date_reelle_fin', 'nouvelle_date', 'date_debut']);
-      const f = vbDateProposee(a, ['date_reelle_fin', 'date_reelle_debut', 'nouvelle_date', 'date_debut']) || d;
-      if(!d){
+      // Début et fin sont lus séparément : recopier l'un sur l'autre écraserait une
+      // intervention de dix jours par une date unique. On ne les confond que pour un
+      // jalon ponctuel, où début et fin coïncident par nature.
+      let d = vbDateNorm(a.date_reelle_debut);
+      let f = vbDateNorm(a.date_reelle_fin);
+      if(!d && !f){
+        const seule = vbDateProposee(a, ['nouvelle_date', 'date_debut']);
+        if(seule){ d = seule; }
+      }
+      const ponctuel = (Number(t.duration) === 0) || (t.start_date && t.start_date === t.end_date);
+      if(ponctuel){ d = d || f; f = f || d; }
+
+      if(f && d && f < d){ const tmp = d; d = f; f = tmp; }   // inversion manifeste
+
+      if(!d && !f){
         // La date manque vraiment : on la demande plutôt que de renvoyer une erreur sèche.
         cartes.push({ choix: vbCarteSaisieDate(p, ti, 'Quelle date de réalisation pour « ' + vbEsc(t.name || 'cette tâche') + '  » ?') });
         return;
       }
 
       const idx = vbAssistantActions.push({ type: 'date_reelle', projectId: p.id, ti, debut: d, fin: f }) - 1;
+      const lisible = (d && f && d !== f) ? ('du <b>' + vbEsc(d) + '</b> au <b>' + vbEsc(f) + '</b>')
+        : (d && f) ? ('le <b>' + vbEsc(d) + '</b>')
+        : d ? ('début le <b>' + vbEsc(d) + '</b> <span style="color:#888">(fin non renseignée)</span>')
+        : ('fin le <b>' + vbEsc(f) + '</b> <span style="color:#888">(début non renseigné)</span>');
       const detail = '<b>' + vbEsc(p.name) + '</b><br>' + vbEsc(t.name || 'Tâche')
-        + '<div style="margin-top:6px;font-size:12px">Réalisé : <b>' + vbEsc(d) + (f !== d ? '</b> → <b>' + vbEsc(f) : '') + '</b></div>'
+        + '<div style="margin-top:6px;font-size:12px">Réalisé : ' + lisible + '</div>'
         + (t.start_date ? '<div style="margin-top:4px;font-size:11px;color:var(--text2,#666)">Prévu le ' + vbEsc(t.start_date)
             + ' — le prévisionnel n’est pas modifié, l’écart sera visible dans Comparaison.</div>' : '')
         + ((t.actual_start || t.actual_end) ? '<div style="margin-top:4px;font-size:11px;color:#b45309">⚠️ Remplace le réalisé actuel ('
@@ -5420,8 +5461,9 @@ async function vbAssistantAppliquer(idx){
     // week-end vaut pour ce qu'on planifie, pas pour ce qui a eu lieu.
     // Pas de snapshotAndIncrement non plus : le planning prévu ne change pas, l'indice de
     // révision ne doit donc pas bouger — c'est la convention de updateActual().
-    t.actual_start = a.debut;
-    t.actual_end = a.fin;
+    // Un bout non renseigné n'efface pas ce qui était déjà saisi.
+    if(a.debut) t.actual_start = a.debut;
+    if(a.fin) t.actual_end = a.fin;
     save();
     vbAssistantFermerCarte(idx, '✅ Réalisé enregistré — visible dans l’onglet « Dates réelles »', '#86efac');
     showNotification('✅ Date réelle enregistrée');
