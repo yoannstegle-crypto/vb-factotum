@@ -4809,6 +4809,10 @@ function vbAssistantFacts(){
       nom: t.name || 'Sans nom',
       debut: t.start_date || null,
       fin: t.end_date || null,
+      // Le réalisé : permet de répondre à « qu'est-ce qui est déjà fait ? » et d'avertir
+      // avant d'écraser une saisie existante.
+      reel_debut: t.actual_start || null,
+      reel_fin: t.actual_end || null,
       categorie: t.category || null,
       // Le jalon est décisif : les tâches sont souvent nommées en anglais (« Set up of the
       // machine »), alors que l'utilisateur dit « la mise en service ». Sans ce tag, le
@@ -4854,10 +4858,17 @@ const VB_ASSISTANT_SCHEMA = {
       items: {
         type: 'OBJECT',
         properties: {
-          type: { type: 'STRING', description: "'date' pour décaler une tâche, 'gantt' pour produire l'image du planning" },
+          type: { type: 'STRING', description: "'date' décale une tâche prévue · 'date_reelle' enregistre ce qui s'est réellement passé · 'ajout_tache' crée une tâche ou un jalon · 'gantt' produit l'image du planning" },
           projet_id: { type: 'NUMBER', description: "Identifiant du projet, repris tel quel depuis l'inventaire" },
-          tache_index: { type: 'NUMBER', description: "Index 'i' de la tâche dans l'inventaire (type 'date' uniquement)" },
-          nouvelle_date: { type: 'STRING', description: "Nouvelle date de DÉBUT au format AAAA-MM-JJ (type 'date' uniquement)" },
+          tache_index: { type: 'NUMBER', description: "Index 'i' de la tâche dans l'inventaire ('date' et 'date_reelle')" },
+          nouvelle_date: { type: 'STRING', description: "Nouvelle date de DÉBUT prévue, AAAA-MM-JJ (type 'date')" },
+          date_reelle_debut: { type: 'STRING', description: "Date de réalisation effective, AAAA-MM-JJ (type 'date_reelle')" },
+          date_reelle_fin: { type: 'STRING', description: "Date de fin effective, AAAA-MM-JJ (type 'date_reelle'). Pour un événement ponctuel — un paiement, un jalon — mettre la même valeur qu'au début." },
+          nom: { type: 'STRING', description: "Nom de la tâche à créer (type 'ajout_tache')" },
+          categorie: { type: 'STRING', description: "Catégorie parmi : payment, reception, installation, testing, logistics, training, misc (type 'ajout_tache')" },
+          date_debut: { type: 'STRING', description: "Date de début prévue de la tâche à créer, AAAA-MM-JJ (type 'ajout_tache')" },
+          duree: { type: 'NUMBER', description: "Durée en jours de la tâche à créer ; 0 pour un jalon ponctuel (type 'ajout_tache')" },
+          responsable: { type: 'STRING', description: "Qui réalise la tâche à créer — souvent le client pour un paiement (type 'ajout_tache')" },
           libelle: { type: 'STRING', description: "Description courte et lisible de l'opération" }
         },
         required: ['type', 'projet_id']
@@ -4893,6 +4904,13 @@ Modifications de planning :
 - Les tâches portent souvent un nom anglais. Quand l'utilisateur parle d'un jalon — « mise en service », « MES », « installation », « PV final », « réception finale » — fie-toi au champ "jalon" de l'inventaire, pas au nom de la tâche.
 - Si tu hésites entre deux tâches ou deux projets, ne propose rien : demande lequel.
 - S'il réclame le planning en image, produis une action de type "gantt" avec le "projet_id".
+
+Réalisé et création :
+- Quand il t'annonce qu'une chose A EU LIEU — « le client a payé », « l'installation est terminée », « la FAT a été faite hier » — c'est une date RÉELLE : produis une action "date_reelle", jamais "date". Décaler le prévisionnel effacerait ce qui était planifié.
+- « ce jour », « aujourd'hui » désignent la date du champ "date_iso" ci-dessus.
+- Pour un événement ponctuel (paiement, jalon), renseigne la même valeur en début et en fin.
+- Quand il demande d'ajouter une tâche ou un jalon — « rajoute un jalon de paiement », « ajoute une formation » — produis une action "ajout_tache" avec le nom, la catégorie, la date de début et la durée (0 pour un jalon). Un acompte ou un paiement relève de la catégorie "payment", et le responsable est le client.
+- Ces opérations sont possibles : ne réponds jamais que tu ne peux pas modifier les données. Tu proposes, l'utilisateur valide.
 - Dans "reponse", annonce ce que tu proposes ; c'est lui qui validera.
 
 Question : ${question}`;
@@ -5068,7 +5086,7 @@ function vbResoudreTache(p, a){
   const ti = Number(a.tache_index);
   if(Number.isInteger(ti) && ti >= 0 && ti < taches.length) return ti;
 
-  const texte = String(a.libelle || '').toLowerCase();
+  const texte = String(a.libelle || a.nom || '').toLowerCase();
   if(!texte) return null;
 
   const jalons = { mes: /mise en service|\bmes\b|commissioning|set up/, installation: /installation/, pv_final: /pv final|réception finale|final reception|\bsat\b/ };
@@ -5145,6 +5163,45 @@ function vbAssistantProposer(actions){
     if(a.type === 'gantt'){
       const idx = vbAssistantActions.push({ type: 'gantt', projectId: p.id, libelle: a.libelle || ('Planning de ' + p.name) }) - 1;
       cartes.push({ idx, titre: '🖼 Image du planning', detail: vbEsc(p.name), bouton: 'Produire l’image' });
+      return;
+    }
+
+    if(a.type === 'date_reelle'){
+      const ti = vbResoudreTache(p, a);
+      if(ti == null){ cartes.push({ erreur: 'Impossible d’identifier la tâche réalisée dans « ' + vbEsc(p.name) + ' »' }); return; }
+      const t = p.tasks[ti];
+      const d = a.date_reelle_debut || a.date_reelle_fin;
+      const f = a.date_reelle_fin || a.date_reelle_debut;
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(d || '')){ cartes.push({ erreur: 'Date de réalisation illisible' }); return; }
+
+      const idx = vbAssistantActions.push({ type: 'date_reelle', projectId: p.id, ti, debut: d, fin: f }) - 1;
+      const detail = '<b>' + vbEsc(p.name) + '</b><br>' + vbEsc(t.name || 'Tâche')
+        + '<div style="margin-top:6px;font-size:12px">Réalisé : <b>' + vbEsc(d) + (f !== d ? '</b> → <b>' + vbEsc(f) : '') + '</b></div>'
+        + (t.start_date ? '<div style="margin-top:4px;font-size:11px;color:var(--text2,#666)">Prévu le ' + vbEsc(t.start_date)
+            + ' — le prévisionnel n’est pas modifié, l’écart sera visible dans Comparaison.</div>' : '')
+        + ((t.actual_start || t.actual_end) ? '<div style="margin-top:4px;font-size:11px;color:#b45309">⚠️ Remplace le réalisé actuel ('
+            + vbEsc(t.actual_start || '—') + ' → ' + vbEsc(t.actual_end || '—') + ')</div>' : '');
+      cartes.push({ idx, titre: '✅ Date réelle', detail, bouton: 'Enregistrer' });
+      return;
+    }
+
+    if(a.type === 'ajout_tache'){
+      const nom = String(a.nom || '').trim();
+      if(!nom){ cartes.push({ erreur: 'Nom de tâche manquant' }); return; }
+      const debut = /^\d{4}-\d{2}-\d{2}$/.test(a.date_debut || '') ? vbLundiSiWeekEnd(a.date_debut) : null;
+      const duree = Math.max(0, Number(a.duree) || 0);
+      const cat = (typeof CAT_LABELS === 'object' && CAT_LABELS[a.categorie]) ? a.categorie : 'misc';
+
+      const idx = vbAssistantActions.push({ type: 'ajout_tache', projectId: p.id, nom, cat, debut, duree, qui: String(a.responsable || '').trim() }) - 1;
+      let detail = '<b>' + vbEsc(p.name) + '</b><br><b>' + vbEsc(nom) + '</b>'
+        + '<div style="margin-top:6px;font-size:12px">' + vbEsc(CAT_LABELS[cat] || cat)
+        + (debut ? ' · ' + vbEsc(debut) : ' · sans date')
+        + (duree ? ' · ' + duree + ' j' : ' · jalon ponctuel')
+        + (a.responsable ? ' · ' + vbEsc(a.responsable) : '') + '</div>';
+      if(debut && debut !== a.date_debut){
+        detail += '<div style="margin-top:5px;font-size:11px;color:#b45309">⚠️ Le ' + vbEsc(a.date_debut) + ' tombe un week-end : reporté au lundi.</div>';
+      }
+      cartes.push({ idx, titre: '➕ Nouvelle tâche', detail, bouton: 'Créer' });
       return;
     }
 
@@ -5234,6 +5291,44 @@ async function vbAssistantAppliquer(idx){
     }catch(e){
       vbAssistantPush('assistant', '⚠️ ' + e.message);
     }
+    return;
+  }
+
+  if(a.type === 'date_reelle'){
+    const t = (p.tasks || [])[a.ti];
+    if(!t){ vbAssistantFermerCarte(idx, '⚠️ Tâche introuvable', '#fca5a5'); return; }
+    // Aucun report au lundi ici : un paiement reçu un samedi l'a été un samedi. La règle
+    // week-end vaut pour ce qu'on planifie, pas pour ce qui a eu lieu.
+    // Pas de snapshotAndIncrement non plus : le planning prévu ne change pas, l'indice de
+    // révision ne doit donc pas bouger — c'est la convention de updateActual().
+    t.actual_start = a.debut;
+    t.actual_end = a.fin;
+    save();
+    vbAssistantFermerCarte(idx, '✅ Réalisé enregistré — visible dans l’onglet « Dates réelles »', '#86efac');
+    showNotification('✅ Date réelle enregistrée');
+    if(currentProjectId === p.id && typeof renderProjectDetail === 'function') renderProjectDetail(p.id);
+    else if(typeof renderDashboard === 'function' && document.getElementById('page-dashboard')?.classList.contains('active')) renderDashboard();
+    return;
+  }
+
+  if(a.type === 'ajout_tache'){
+    snapshotAndIncrement(p, 'Assistant — ajout : ' + a.nom);
+    let fin = null;
+    if(a.debut){
+      const e = new Date(a.debut);
+      e.setDate(e.getDate() + (a.duree || 0));
+      fin = vbLundiSiWeekEnd(e.toISOString().slice(0, 10));
+    }
+    p.tasks.push({
+      name: a.nom, who: a.qui || '', category: a.cat,
+      start_date: a.debut, end_date: fin, duration: a.duree,
+      actual_start: null, actual_end: null, dep_task_idx: null, dep_offset: 0
+    });
+    save();
+    vbAssistantFermerCarte(idx, '✅ Tâche créée — révision ' + getProjectIndice(p), '#86efac');
+    showNotification('✅ « ' + a.nom + ' » ajoutée');
+    if(currentProjectId === p.id && typeof renderProjectDetail === 'function') renderProjectDetail(p.id);
+    else if(typeof renderDashboard === 'function' && document.getElementById('page-dashboard')?.classList.contains('active')) renderDashboard();
     return;
   }
 
