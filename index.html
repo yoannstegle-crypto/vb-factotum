@@ -895,6 +895,10 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
       <div class="form-row">
         <div class="form-group"><label class="form-label">Clé API Gemini</label>
           <input type="password" class="form-input" id="cfg-gemini-key" placeholder="AIza…" autocomplete="off"></div>
+        <div class="form-group"><label class="form-label">Modèle</label>
+          <input type="text" class="form-input" id="cfg-gemini-model" autocomplete="off">
+          <div style="font-size:11px;color:var(--text3,#999);margin-top:3px">Laisser vide pour le modèle par défaut. Google en retire régulièrement : si l'assistant signale qu'un modèle n'est plus disponible, il vous proposera le remplaçant.</div>
+        </div>
       </div>
       <div style="margin-top:14px">
         <div style="font-size:12px;font-weight:600;margin-bottom:4px">🧠 Ce que l'assistant a retenu</div>
@@ -3336,6 +3340,9 @@ function saveProject(){
 function initConfigPage(){
   document.getElementById('cfg-app-name').value=config.appName||'VB-Factory';
   document.getElementById('cfg-gemini-key').value=vbGeminiKey();
+  const mdl=document.getElementById('cfg-gemini-model');
+  mdl.value=vbGeminiModel()===VB_GEMINI_MODEL_DEFAUT?'':vbGeminiModel();
+  mdl.placeholder=VB_GEMINI_MODEL_DEFAUT;
   vbRenderAssistantLists();
   document.getElementById('cfg-target-gap').value=config.targetGapDays;
   document.getElementById('cfg-alert-threshold').value=config.alertThreshold;
@@ -3353,7 +3360,7 @@ function renderTemplatesList(){const el=document.getElementById('templates-list'
   el.innerHTML=tpls.map((t,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg2);border-radius:6px;margin-bottom:8px"><span style="flex:1;font-size:13px;font-weight:500">${vbEsc(t.name)}</span><span style="font-size:11px;color:var(--text3)">${t.tasks.length} tâches</span><button class="btn btn-sm btn-danger" onclick="deleteTemplate(${i})">🗑</button></div>`).join('');}
 function addNewTemplate(){if(!config.templates)config.templates=JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));config.templates.push({id:'tpl_'+Date.now(),name:'Nouveau template',tasks:[]});renderTemplatesList();}
 function deleteTemplate(i){if(!confirm('Supprimer ?'))return;getTemplates().splice(i,1);renderTemplatesList();}
-function saveConfigPage(){vbGeminiSetKey(document.getElementById('cfg-gemini-key').value);config.appName=(document.getElementById('cfg-app-name').value||'').trim()||'VB-Factory';config.targetGapDays=parseInt(document.getElementById('cfg-target-gap').value)||5;config.alertThreshold=parseInt(document.getElementById('cfg-alert-threshold').value)||70;localStorage.setItem('kropp_config_v3',JSON.stringify(config));vbApplyAppName();if(typeof vbMarkDirty==='function')vbMarkDirty();showNotification('✅ Configuration enregistrée');showPage('dashboard');}
+function saveConfigPage(){vbGeminiSetKey(document.getElementById('cfg-gemini-key').value);vbGeminiSetModel(document.getElementById('cfg-gemini-model').value);config.appName=(document.getElementById('cfg-app-name').value||'').trim()||'VB-Factory';config.targetGapDays=parseInt(document.getElementById('cfg-target-gap').value)||5;config.alertThreshold=parseInt(document.getElementById('cfg-alert-threshold').value)||70;localStorage.setItem('kropp_config_v3',JSON.stringify(config));vbApplyAppName();if(typeof vbMarkDirty==='function')vbMarkDirty();showNotification('✅ Configuration enregistrée');showPage('dashboard');}
 
 // ── EXPORT ──
 function initExportPage(){
@@ -4569,8 +4576,11 @@ function renderFLEtape3New(p){
 // formuler. Un modèle à qui on demande de compter des jours se trompe.
 
 const VB_GEMINI_ROOT = 'https://generativelanguage.googleapis.com/v1beta/models';
-const VB_GEMINI_MODEL = 'gemini-2.5-flash';
+// Google retire régulièrement ses modèles. Le nom est donc réglable depuis Configuration :
+// une mise hors service ne doit pas exiger une intervention sur le code.
+const VB_GEMINI_MODEL_DEFAUT = 'gemini-3.6-flash';
 const VB_GEMINI_KEY_STORAGE = 'vb_gemini_key';
+const VB_GEMINI_MODEL_STORAGE = 'vb_gemini_model';
 // Noms français des jalons, tels que l'utilisateur les prononce.
 const VB_MILESTONE_JALON_FR = {
   installation: 'Installation mécanique',
@@ -4584,6 +4594,29 @@ const VB_ASSISTANT_MAX_MEMOIRE = 60;
 function vbGeminiKey(){ try{ return localStorage.getItem(VB_GEMINI_KEY_STORAGE) || ''; }catch(e){ return ''; } }
 function vbGeminiSetKey(k){ try{ localStorage.setItem(VB_GEMINI_KEY_STORAGE, (k||'').trim()); }catch(e){} }
 function vbGeminiReady(){ return !!vbGeminiKey(); }
+function vbGeminiModel(){ try{ return localStorage.getItem(VB_GEMINI_MODEL_STORAGE) || VB_GEMINI_MODEL_DEFAUT; }catch(e){ return VB_GEMINI_MODEL_DEFAUT; } }
+function vbGeminiSetModel(m){
+  try{
+    const v=(m||'').trim();
+    if(v && v!==VB_GEMINI_MODEL_DEFAUT) localStorage.setItem(VB_GEMINI_MODEL_STORAGE, v);
+    else localStorage.removeItem(VB_GEMINI_MODEL_STORAGE);
+  }catch(e){}
+}
+// Quand Google retire un modèle, sa réponse nomme le remplaçant. Plutôt que de laisser
+// l'utilisateur devant un message d'erreur, on en extrait le nom pour le lui proposer.
+function vbGeminiModeleSuggere(msg){
+  const m = /models\/([A-Za-z0-9.\-]+)/g;
+  const noms = [];
+  let x;
+  while((x = m.exec(msg || '')) !== null) noms.push(x[1]);
+  const actuel = vbGeminiModel();
+  return noms.find(n => n !== actuel) || null;
+}
+async function vbGeminiBasculerModele(nom){
+  vbGeminiSetModel(nom);
+  showNotification('✅ Modèle basculé sur ' + nom);
+  vbAssistantPush('assistant', 'Modèle basculé sur « ' + nom +' ». Reposez votre question.');
+}
 
 async function vbGeminiCall({ prompt, schema, history }){
   const cle = vbGeminiKey();
@@ -4601,7 +4634,7 @@ async function vbGeminiCall({ prompt, schema, history }){
 
   let rep;
   try{
-    rep = await fetch(VB_GEMINI_ROOT + '/' + encodeURIComponent(VB_GEMINI_MODEL) + ':generateContent?key=' + encodeURIComponent(cle), {
+    rep = await fetch(VB_GEMINI_ROOT + '/' + encodeURIComponent(vbGeminiModel()) + ':generateContent?key=' + encodeURIComponent(cle), {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps)
     });
   }catch(e){
@@ -4614,6 +4647,12 @@ async function vbGeminiCall({ prompt, schema, history }){
     try{ const j = JSON.parse(detail); if(j.error && j.error.message) msg = j.error.message; }catch(e){}
     if(rep.status === 400 && /API key/i.test(msg)) msg = 'Clé Gemini refusée. Vérifiez-la dans Configuration.';
     if(rep.status === 429) msg = 'Quota Gemini atteint. Réessayez dans quelques minutes.';
+    if(/no longer available|not found|deprecat/i.test(msg)){
+      const err = new Error('Le modèle « ' + vbGeminiModel() + ' » n’est plus disponible.');
+      err.modeleSuggere = vbGeminiModeleSuggere(msg);
+      err.detailGoogle = msg;
+      throw err;
+    }
     throw new Error(msg);
   }
 
@@ -4897,7 +4936,18 @@ async function vbAssistantAsk(question){
     if(touche) vbSaveConfig();
   }catch(e){
     vbAssistantBusy = false;
-    vbAssistantPush('assistant', '⚠️ ' + e.message);
+    if(e.modeleSuggere){
+      // Google a nommé le remplaçant : on l'offre en un clic plutôt qu'en message d'erreur.
+      vbAssistantPush('assistant', '⚠️ ' + e.message);
+      vbAssistantHistory.push({ role: 'carte', text: '', html:
+        '<div style="border:1px solid #fcd34d;background:#fffbeb;border-radius:10px;padding:11px 13px;margin-top:8px">'
+        + '<div style="font-size:12px;line-height:1.5">Google recommande <b>' + vbEsc(e.modeleSuggere) + '</b>.</div>'
+        + '<button class="btn btn-primary btn-sm" style="margin-top:9px" onclick="vbGeminiBasculerModele(\'' + vbEsc(e.modeleSuggere) + '\')">'
+        + 'Basculer sur ce modèle</button></div>' });
+      vbAssistantRender();
+    } else {
+      vbAssistantPush('assistant', '⚠️ ' + e.message);
+    }
   }
 }
 
