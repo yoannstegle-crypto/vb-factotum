@@ -4598,6 +4598,37 @@ const VB_MILESTONE_JALON_FR = {
   mes: 'Mise en service (MES)',
   pv_final: 'PV final / réception finale'
 };
+// Champs de la fiche de liaison, par étape. Sert à mesurer l'avancement du remplissage.
+// Réserve : une case à cocher laissée décochée vaut false, indiscernable d'une case jamais
+// vue — l'avancement est donc un minorant, ce que la consigne dit explicitement au modèle.
+const VB_FL_CHAMPS = {
+  e1: ['address','cad','comment','contact_email','contact_fn','contact_name','contact_tel','doc_de','doc_en','doc_fr','kb_azerty','kb_cyrillic','kb_qwerty','marker_10','marker_127','marker_158','marker_chars','marker_on','os_de','os_en','os_fr','plan_etude_rev','plan_impl_note','plan_impl_rev','remote_4g','remote_lan','remote_vnc','tooling_extra'],
+  e2: ['access_detail','bridge_cap','comment','crane_note','del_lv','del_sam','delivery_addr','delivery_contact','delivery_from','delivery_tel','delivery_to','fat_contact','fat_contact2','fat_date','fat_doc_pv','fat_doc_report','fat_doc_video','fat_type','fork_cap','heaviest','install_date','lift_bridge','lift_crane','lift_fork','unavail'],
+  e3: ['access_from','access_to','comment','days_note','exp_life','exp_local','exp_none','exp_travel','site_rules_detail','staff_elec','staff_meca','tech_email','tech_fn','tech_name','tech_tel','training_detail','truck_detail']
+};
+const VB_FL_ETAPE_NOM = { e1: 'Étape 1 — étude', e2: 'Étape 2 — FAT et livraison', e3: 'Étape 3 — installation' };
+
+function vbFlAvancement(p){
+  const fl = p.fiche_liaison || {};
+  const etapes = {};
+  let total = 0, remplis = 0;
+  Object.keys(VB_FL_CHAMPS).forEach(e => {
+    const d = fl[e] || {};
+    const champs = VB_FL_CHAMPS[e];
+    const n = champs.filter(c => {
+      const v = d[c];
+      return v !== undefined && v !== null && v !== '' && v !== false;
+    }).length;
+    total += champs.length; remplis += n;
+    etapes[VB_FL_ETAPE_NOM[e]] = n + '/' + champs.length + (n === 0 ? ' (non commencée)' : '');
+  });
+  return {
+    etat: remplis === 0 ? 'vide' : (remplis >= total * 0.8 ? 'quasi complète' : 'partielle'),
+    champs_renseignes: remplis + '/' + total,
+    detail: etapes
+  };
+}
+
 const VB_ASSISTANT_MAX_ALERTS = 60;   // au-delà, le contexte coûte cher sans rien apporter
 const VB_ASSISTANT_MAX_RESERVES = 40;
 const VB_ASSISTANT_MAX_MEMOIRE = 60;
@@ -4772,6 +4803,7 @@ function vbAssistantFacts(){
     id: p.id,
     nom: p.name,
     statut: p.status,
+    fiche_liaison: vbFlAvancement(p),
     taches: (p.tasks || []).map((t, i) => ({
       i,
       nom: t.name || 'Sans nom',
@@ -4850,6 +4882,7 @@ Règles impératives :
 - Sois bref et concret. Des puces, pas de paragraphes. Nomme toujours le projet concerné.
 - Si une information demandée n'est pas dans les données, dis-le franchement plutôt que de supposer.
 - La section "memoire" contient ce que l'utilisateur t'a précisé auparavant : tiens-en compte, elle prime sur les données brutes.
+- Chaque projet porte un champ "fiche_liaison" indiquant son avancement de remplissage. Une case à cocher décochée y compte comme non renseignée : annonce donc ces chiffres comme un minimum, sans affirmer qu'une fiche est incomplète sur la seule foi du compte.
 - Si l'utilisateur t'apprend un fait durable (report accordé, attente d'un client, tâche déjà réalisée), reporte-le dans le champ "memoire".
 - S'il exprime un souhait d'évolution de l'application elle-même, reporte-le dans le champ "idees".
 
@@ -5028,6 +5061,52 @@ let vbAssistantActions = [];   // propositions en attente de validation
 
 function vbFindProjet(id){ return (projects || []).find(p => String(p.id) === String(id)) || null; }
 
+// tache_index n'est pas toujours fourni par le modèle. Plutôt que d'échouer, on tente de
+// retrouver la tâche par son libellé puis par son jalon, avant de passer la main.
+function vbResoudreTache(p, a){
+  const taches = p.tasks || [];
+  const ti = Number(a.tache_index);
+  if(Number.isInteger(ti) && ti >= 0 && ti < taches.length) return ti;
+
+  const texte = String(a.libelle || '').toLowerCase();
+  if(!texte) return null;
+
+  const jalons = { mes: /mise en service|\bmes\b|commissioning|set up/, installation: /installation/, pv_final: /pv final|réception finale|final reception|\bsat\b/ };
+  for(const cle in jalons){
+    if(jalons[cle].test(texte)){
+      const i = taches.findIndex(t => t.milestone === cle);
+      if(i >= 0) return i;
+    }
+  }
+  // Seuil à 3 caractères : les sigles du métier — FAT, MES, SAT, PV — sont précisément
+  // ce qui identifie la tâche. Une liste de mots vides évite de s'accrocher aux liaisons.
+  const vides = ['pour','dans','avec','cette','cette','les','des','une','est','sur','par','aux','que','qui','del','the','and'];
+  const mots = texte.split(/[^a-zà-ÿ0-9]+/).filter(m => m.length >= 3 && !vides.includes(m));
+  let meilleur = -1, score = 0;
+  taches.forEach((t, i) => {
+    const nom = String(t.name || '').toLowerCase();
+    const n = mots.filter(m => nom.includes(m)).length;
+    if(n > score){ score = n; meilleur = i; }
+  });
+  return score > 0 ? meilleur : null;
+}
+
+// Liste cliquable des tâches datées, pour trancher quand la cible reste incertaine.
+function vbCarteChoixTache(p, date){
+  const options = (p.tasks || []).map((t, i) => ({ i, t }))
+    .filter(x => x.t.start_date)
+    .map(x => {
+      const idx = vbAssistantActions.push({ type: 'date', projectId: p.id, ti: x.i, nouvelleDate: date }) - 1;
+      return '<button class="btn btn-sm" style="display:block;width:100%;text-align:left;margin-top:4px" onclick="vbAssistantAppliquer(' + idx + ')">'
+        + vbEsc(x.t.name || 'Tâche ' + x.i) + ' <span style="color:#888">(' + vbEsc(x.t.start_date) + ')</span></button>';
+    }).join('');
+  return '<div style="border:1px solid #fcd34d;background:#fffbeb;border-radius:10px;padding:11px 13px;margin-top:8px">'
+    + '<div style="font-weight:700;font-size:12px;margin-bottom:4px">📅 Quelle tâche décaler au ' + vbEsc(vbLundiSiWeekEnd(date)) + ' ?</div>'
+    + '<div style="font-size:11px;color:var(--text2,#666);margin-bottom:6px">' + vbEsc(p.name) + '</div>'
+    + (options || '<div style="font-size:12px;color:#991b1b">Aucune tâche datée dans ce projet.</div>')
+    + '</div>';
+}
+
 // Applique le décalage sur une copie pour montrer l'impact réel avant toute écriture.
 function vbSimuleDecalage(p, ti, nouvelleDate){
   const copie = JSON.parse(JSON.stringify(p));
@@ -5070,10 +5149,16 @@ function vbAssistantProposer(actions){
     }
 
     if(a.type === 'date'){
-      const ti = Number(a.tache_index);
-      const t = (p.tasks || [])[ti];
-      if(!t){ cartes.push({ erreur: 'Tâche introuvable dans « ' + vbEsc(p.name) + ' »' }); return; }
       if(!/^\d{4}-\d{2}-\d{2}$/.test(a.nouvelle_date || '')){ cartes.push({ erreur: 'Date proposée illisible' }); return; }
+
+      const ti = vbResoudreTache(p, a);
+      if(ti == null){
+        // Le modèle n'a pas su désigner la tâche (index omis ou hors limites). Plutôt que
+        // de renvoyer un échec, on laisse l'utilisateur la choisir : il sait, lui.
+        cartes.push({ choix: vbCarteChoixTache(p, a.nouvelle_date) });
+        return;
+      }
+      const t = p.tasks[ti];
 
       const sim = vbSimuleDecalage(p, ti, a.nouvelle_date);
       if(!sim){ cartes.push({ erreur: 'Simulation impossible' }); return; }
@@ -5105,6 +5190,7 @@ function vbAssistantProposer(actions){
 
   if(!cartes.length) return;
   const html = cartes.map(c => {
+    if(c.choix) return c.choix;
     if(c.erreur){
       return '<div style="border:1px solid #fca5a5;background:#fef2f2;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:12px;color:#991b1b">⚠️ ' + c.erreur + '</div>';
     }
