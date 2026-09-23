@@ -4632,10 +4632,28 @@ function vbAssistantFacts(){
   });
   reserves.sort((a, b) => a.jours - b.jours);
 
+  // Inventaire des projets actifs avec l'index de chaque tâche : c'est ce qui permet au
+  // modèle de désigner une cible sans ambiguïté, plutôt que de la décrire en toutes lettres.
+  const inventaire = (projects || []).filter(p => p.status !== 'cloture').map(p => ({
+    id: p.id,
+    nom: p.name,
+    statut: p.status,
+    taches: (p.tasks || []).map((t, i) => ({
+      i,
+      nom: t.name || 'Sans nom',
+      debut: t.start_date || null,
+      fin: t.end_date || null,
+      categorie: t.category || null,
+      depend_de: (t.dep_task_idx != null ? Number(t.dep_task_idx) : null)
+    }))
+  }));
+
   return {
     date_du_jour: today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+    date_iso: today.toISOString().slice(0, 10),
     semaine_iso: (typeof vbIsoWeekNumber === 'function' ? vbIsoWeekNumber(today) : null),
     projets_actifs: (projects || []).filter(p => p.status !== 'cloture').length,
+    projets: inventaire,
     en_retard: alerts.filter(a => a.type === 'late').slice(0, VB_ASSISTANT_MAX_ALERTS).map(ligneAlerte),
     a_venir_7j: alerts.filter(a => a.type === 'soon').slice(0, VB_ASSISTANT_MAX_ALERTS).map(ligneAlerte),
     paiements: alerts.filter(a => a.type === 'payment').slice(0, VB_ASSISTANT_MAX_ALERTS).map(ligneAlerte),
@@ -4659,6 +4677,21 @@ const VB_ASSISTANT_SCHEMA = {
       type: 'ARRAY',
       description: "Souhaits d'évolution de l'application exprimés par l'utilisateur. Vide s'il n'en exprime aucun.",
       items: { type: 'STRING' }
+    },
+    actions: {
+      type: 'ARRAY',
+      description: "Opérations à PROPOSER à l'utilisateur. Elles ne sont jamais exécutées sans sa validation. Vide s'il ne demande rien de tel.",
+      items: {
+        type: 'OBJECT',
+        properties: {
+          type: { type: 'STRING', description: "'date' pour décaler une tâche, 'gantt' pour produire l'image du planning" },
+          projet_id: { type: 'NUMBER', description: "Identifiant du projet, repris tel quel depuis l'inventaire" },
+          tache_index: { type: 'NUMBER', description: "Index 'i' de la tâche dans l'inventaire (type 'date' uniquement)" },
+          nouvelle_date: { type: 'STRING', description: "Nouvelle date de DÉBUT au format AAAA-MM-JJ (type 'date' uniquement)" },
+          libelle: { type: 'STRING', description: "Description courte et lisible de l'opération" }
+        },
+        required: ['type', 'projet_id']
+      }
     }
   },
   required: ['reponse']
@@ -4681,6 +4714,14 @@ Règles impératives :
 - La section "memoire" contient ce que l'utilisateur t'a précisé auparavant : tiens-en compte, elle prime sur les données brutes.
 - Si l'utilisateur t'apprend un fait durable (report accordé, attente d'un client, tâche déjà réalisée), reporte-le dans le champ "memoire".
 - S'il exprime un souhait d'évolution de l'application elle-même, reporte-le dans le champ "idees".
+
+Modifications de planning :
+- S'il annonce une nouvelle date pour une tâche, n'en parle pas au passé : produis une entrée dans "actions" de type "date", avec le "projet_id" et le "tache_index" repris de l'inventaire, et la nouvelle date de début en AAAA-MM-JJ.
+- Ne calcule PAS les conséquences du décalage : l'application recalcule elle-même les tâches dépendantes et te montrera le résultat. Contente-toi de désigner la tâche et sa nouvelle date.
+- Si l'année n'est pas précisée, déduis-la du champ "date_iso" ci-dessus en retenant l'occurrence la plus proche.
+- Si tu hésites entre deux tâches ou deux projets, ne propose rien : demande lequel.
+- S'il réclame le planning en image, produis une action de type "gantt" avec le "projet_id".
+- Dans "reponse", annonce ce que tu proposes ; c'est lui qui validera.
 
 Question : ${question}`;
 }
@@ -4757,6 +4798,8 @@ function vbAssistantRender(){
   const box = document.getElementById('vb-assistant-messages');
   if(!box) return;
   box.innerHTML = vbAssistantHistory.map(m => {
+    // Les cartes d'action portent du HTML construit par l'application, jamais par le modèle.
+    if(m.role === 'carte') return m.html || '';
     const corps = vbEsc(m.text).replace(/\n/g, '<br>');
     if(m.role === 'user'){
       return '<div style="margin-bottom:14px;text-align:right"><div style="display:inline-block;background:var(--purple-600,#534AB7);color:#fff;'
@@ -4793,7 +4836,7 @@ async function vbAssistantAsk(question){
   try{
     // L'historique transmis exclut le dernier message : il part dans le prompt,
     // accompagné des faits à jour.
-    const hist = vbAssistantHistory.slice(0, -1).slice(-8);
+    const hist = vbAssistantHistory.filter(m => m.role === 'user' || m.role === 'assistant').slice(0, -1).slice(-8);
     const res = await vbGeminiCall({
       prompt: vbAssistantPrompt(question),
       schema: VB_ASSISTANT_SCHEMA,
@@ -4801,6 +4844,7 @@ async function vbAssistantAsk(question){
     });
     vbAssistantBusy = false;
     vbAssistantPush('assistant', res.reponse || '(réponse vide)');
+    if(Array.isArray(res.actions) && res.actions.length) vbAssistantProposer(res.actions);
 
     let touche = false;
     if(Array.isArray(res.memoire) && res.memoire.length){
@@ -4819,6 +4863,159 @@ async function vbAssistantAsk(question){
   }catch(e){
     vbAssistantBusy = false;
     vbAssistantPush('assistant', '⚠️ ' + e.message);
+  }
+}
+
+
+// ─── Opérations proposées par l'assistant ───
+// Le modèle désigne la cible, l'application calcule les conséquences. Un décalage de FAT
+// n'est pas un changement de date mais le décalage d'une chaîne : propagateDeps() sait le
+// faire correctement, un modèle de langage non.
+
+let vbAssistantActions = [];   // propositions en attente de validation
+
+function vbFindProjet(id){ return (projects || []).find(p => String(p.id) === String(id)) || null; }
+
+// Applique le décalage sur une copie pour montrer l'impact réel avant toute écriture.
+function vbSimuleDecalage(p, ti, nouvelleDate){
+  const copie = JSON.parse(JSON.stringify(p));
+  const t = copie.tasks[ti];
+  if(!t) return null;
+  const avant = (p.tasks || []).map(x => ({ nom: x.name, debut: x.start_date, fin: x.end_date }));
+
+  const ancienDebut = t.start_date;
+  if(ancienDebut && t.end_date){
+    // On conserve la durée : décaler une tâche ne la raccourcit pas.
+    const duree = Math.round((new Date(t.end_date) - new Date(ancienDebut)) / 86400000);
+    const fin = new Date(nouvelleDate);
+    fin.setDate(fin.getDate() + duree);
+    t.end_date = fin.toISOString().slice(0, 10);
+  }
+  t.start_date = nouvelleDate;
+  propagateDeps(copie, ti);
+
+  const apres = copie.tasks.map(x => ({ nom: x.name, debut: x.start_date, fin: x.end_date }));
+  const diff = [];
+  apres.forEach((a, i) => {
+    const b = avant[i];
+    if(!b) return;
+    if(a.debut !== b.debut || a.fin !== b.fin) diff.push({ i, nom: a.nom, avant: b.debut, apres: a.debut });
+  });
+  return { copie, diff, ancienDebut };
+}
+
+function vbAssistantProposer(actions){
+  const cartes = [];
+  (actions || []).forEach(a => {
+    const p = vbFindProjet(a.projet_id);
+    if(!p){ cartes.push({ erreur: 'Projet introuvable (' + vbEsc(String(a.projet_id)) + ')' }); return; }
+
+    if(a.type === 'gantt'){
+      const idx = vbAssistantActions.push({ type: 'gantt', projectId: p.id, libelle: a.libelle || ('Planning de ' + p.name) }) - 1;
+      cartes.push({ idx, titre: '🖼 Image du planning', detail: vbEsc(p.name), bouton: 'Produire l’image' });
+      return;
+    }
+
+    if(a.type === 'date'){
+      const ti = Number(a.tache_index);
+      const t = (p.tasks || [])[ti];
+      if(!t){ cartes.push({ erreur: 'Tâche introuvable dans « ' + vbEsc(p.name) + ' »' }); return; }
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(a.nouvelle_date || '')){ cartes.push({ erreur: 'Date proposée illisible' }); return; }
+
+      const sim = vbSimuleDecalage(p, ti, a.nouvelle_date);
+      if(!sim){ cartes.push({ erreur: 'Simulation impossible' }); return; }
+      const idx = vbAssistantActions.push({
+        type: 'date', projectId: p.id, ti, nouvelleDate: a.nouvelle_date,
+        libelle: a.libelle || ((t.name || 'Tâche') + ' → ' + a.nouvelle_date)
+      }) - 1;
+
+      const cascade = sim.diff.filter(d => d.i !== ti);
+      let detail = '<b>' + vbEsc(p.name) + '</b><br>' + vbEsc(t.name || 'Tâche') + ' : '
+        + '<span style="color:#888;text-decoration:line-through">' + vbEsc(sim.ancienDebut || '—') + '</span> → <b>' + vbEsc(a.nouvelle_date) + '</b>';
+      if(cascade.length){
+        detail += '<div style="margin-top:6px;font-size:11px;color:var(--text2,#666)">'
+          + cascade.length + ' tâche(s) dépendante(s) décalée(s) :<br>'
+          + cascade.slice(0, 5).map(d => '· ' + vbEsc(d.nom) + ' ' + vbEsc(d.avant || '—') + ' → ' + vbEsc(d.apres || '—')).join('<br>')
+          + (cascade.length > 5 ? '<br>· … et ' + (cascade.length - 5) + ' autre(s)' : '')
+          + '</div>';
+      } else {
+        detail += '<div style="margin-top:6px;font-size:11px;color:var(--text2,#666)">Aucune tâche dépendante.</div>';
+      }
+      cartes.push({ idx, titre: '📅 Décalage de date', detail, bouton: 'Appliquer' });
+    }
+  });
+
+  if(!cartes.length) return;
+  const html = cartes.map(c => {
+    if(c.erreur){
+      return '<div style="border:1px solid #fca5a5;background:#fef2f2;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:12px;color:#991b1b">⚠️ ' + c.erreur + '</div>';
+    }
+    return '<div id="vb-act-' + c.idx + '" style="border:1px solid var(--purple-200,#AFA9EC);background:#faf9ff;border-radius:10px;padding:11px 13px;margin-top:8px">'
+      + '<div style="font-weight:700;font-size:12px;margin-bottom:5px">' + c.titre + '</div>'
+      + '<div style="font-size:12px;line-height:1.5">' + c.detail + '</div>'
+      + '<div style="display:flex;gap:6px;margin-top:10px">'
+      + '<button class="btn btn-primary btn-sm" onclick="vbAssistantAppliquer(' + c.idx + ')">' + c.bouton + '</button>'
+      + '<button class="btn btn-sm" onclick="vbAssistantAnnuler(' + c.idx + ')">Annuler</button>'
+      + '</div></div>';
+  }).join('');
+  vbAssistantHistory.push({ role: 'carte', text: '', html });
+  vbAssistantRender();
+}
+
+function vbAssistantFermerCarte(idx, message, couleur){
+  const el = document.getElementById('vb-act-' + idx);
+  if(el) el.outerHTML = '<div style="border:1px solid ' + couleur + ';border-radius:10px;padding:9px 12px;margin-top:8px;font-size:12px">' + message + '</div>';
+}
+
+function vbAssistantAnnuler(idx){
+  vbAssistantFermerCarte(idx, '⊘ Abandonné', '#e8e8e5');
+}
+
+async function vbAssistantAppliquer(idx){
+  const a = vbAssistantActions[idx];
+  if(!a) return;
+  const p = vbFindProjet(a.projectId);
+  if(!p){ vbAssistantFermerCarte(idx, '⚠️ Projet introuvable', '#fca5a5'); return; }
+
+  if(a.type === 'gantt'){
+    vbAssistantFermerCarte(idx, '🖼 Génération de l’image…', '#AFA9EC');
+    try{
+      const png = await vbCaptureProjectGanttPng(p);
+      if(!png) throw new Error('Ce projet n’a aucune tâche datée à représenter.');
+      vbAssistantHistory.push({ role: 'carte', text: '', html:
+        '<div style="margin-top:8px"><img src="' + png + '" alt="Planning" style="width:100%;border:1px solid var(--border,#e8e8e5);border-radius:8px">'
+        + '<a href="' + png + '" download="planning-' + vbEsc((p.name || 'projet').replace(/[^\w\-]+/g, '-')) + '.png" '
+        + 'class="btn btn-sm" style="display:inline-block;margin-top:7px;text-decoration:none">⬇ Télécharger l’image</a></div>' });
+      vbAssistantRender();
+    }catch(e){
+      vbAssistantPush('assistant', '⚠️ ' + e.message);
+    }
+    return;
+  }
+
+  if(a.type === 'date'){
+    const t = (p.tasks || [])[a.ti];
+    if(!t){ vbAssistantFermerCarte(idx, '⚠️ Tâche introuvable', '#fca5a5'); return; }
+    const ancien = t.start_date;
+
+    // snapshotAndIncrement archive l'état des tâches et incrémente l'indice de révision :
+    // la modification est datée, commentée et réversible depuis l'historique du projet.
+    snapshotAndIncrement(p, 'Assistant : ' + (t.name || 'tâche') + ' ' + (ancien || '—') + ' → ' + a.nouvelleDate);
+
+    if(ancien && t.end_date){
+      const duree = Math.round((new Date(t.end_date) - new Date(ancien)) / 86400000);
+      const fin = new Date(a.nouvelleDate);
+      fin.setDate(fin.getDate() + duree);
+      t.end_date = fin.toISOString().slice(0, 10);
+    }
+    t.start_date = a.nouvelleDate;
+    propagateDeps(p, a.ti);
+    save();
+
+    vbAssistantFermerCarte(idx, '✅ Appliqué — révision ' + getProjectIndice(p) + ', consultable dans l’historique du projet', '#86efac');
+    showNotification('✅ Planning mis à jour');
+    if(typeof renderDashboard === 'function' && document.getElementById('page-dashboard')?.classList.contains('active')) renderDashboard();
+    if(currentProjectId === p.id && typeof showProjectDetail === 'function') showProjectDetail(p.id);
   }
 }
 
