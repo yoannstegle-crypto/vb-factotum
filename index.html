@@ -1649,6 +1649,26 @@ function snapshotAndIncrement(p,comment=''){
   p.history.push({indice:getProjectIndice(p),date:new Date().toISOString(),comment,tasks:p.tasks.map(t=>({name:t.name,start_date:t.start_date,end_date:t.end_date}))});
   p.indice=(p.indice||0)+1;save();
 }
+// Aucune date de planning ne doit tomber un samedi ou un dimanche : on ne démarre ni ne
+// termine une intervention le week-end. Toute date qui y tombe glisse au lundi suivant.
+// Appliqué à tous les calculs de dates, pas seulement à ceux de l'assistant : la
+// propagation des dépendances produisait déjà des dates de week-end.
+function vbLundiSiWeekEnd(iso){
+  if(!iso) return iso;
+  const d=new Date(iso+'T12:00:00');   // midi : à l'abri des décalages de fuseau
+  if(isNaN(d)) return iso;
+  const j=d.getDay();
+  if(j===6) d.setDate(d.getDate()+2);  // samedi → lundi
+  else if(j===0) d.setDate(d.getDate()+1); // dimanche → lundi
+  else return iso;
+  return d.toISOString().slice(0,10);
+}
+function vbEstWeekEnd(iso){
+  if(!iso) return false;
+  const j=new Date(iso+'T12:00:00').getDay();
+  return j===0||j===6;
+}
+
 function propagateDeps(p,idx){
   const changed=new Set([idx]);let iter=0;
   while(iter++<50){let any=false;
@@ -1658,9 +1678,9 @@ function propagateDeps(p,idx){
       const anchorDate=(t.dep_anchor==='start')?dep?.start_date:dep?.end_date;
       if(!anchorDate)return;
       const ns=new Date(anchorDate);ns.setDate(ns.getDate()+(parseInt(t.dep_offset)||0));
-      const nss=ns.toISOString().slice(0,10);
+      const nss=vbLundiSiWeekEnd(ns.toISOString().slice(0,10));
       if(nss!==t.start_date){
-        if(t.start_date&&t.end_date){const d=Math.round((new Date(t.end_date)-new Date(t.start_date))/86400000);const ne=new Date(ns);ne.setDate(ne.getDate()+d);t.end_date=ne.toISOString().slice(0,10);}
+        if(t.start_date&&t.end_date){const d=Math.round((new Date(t.end_date)-new Date(t.start_date))/86400000);const ne=new Date(nss);ne.setDate(ne.getDate()+d);t.end_date=vbLundiSiWeekEnd(ne.toISOString().slice(0,10));}
         t.start_date=nss;changed.add(i);any=true;
       }
     });if(!any)break;
@@ -1675,9 +1695,9 @@ function vbRecalcFromDep(p,ti){
   if(!anchorDate)return;
   const dur=(t.start_date&&t.end_date)?Math.round((new Date(t.end_date)-new Date(t.start_date))/86400000):(parseInt(t.duration)||0);
   const ns=new Date(anchorDate);ns.setDate(ns.getDate()+(parseInt(t.dep_offset)||0));
-  t.start_date=ns.toISOString().slice(0,10);
-  const ne=new Date(ns);ne.setDate(ne.getDate()+dur);
-  t.end_date=ne.toISOString().slice(0,10);
+  t.start_date=vbLundiSiWeekEnd(ns.toISOString().slice(0,10));
+  const ne=new Date(t.start_date);ne.setDate(ne.getDate()+dur);
+  t.end_date=vbLundiSiWeekEnd(ne.toISOString().slice(0,10));
 }
 // Déplace la tâche fromIdx à la position toIdx dans le tableau, en ré-indexant tous les
 // dep_task_idx (qui pointent par position) pour qu'ils continuent de désigner la bonne tâche.
@@ -3266,13 +3286,17 @@ function renderAnchors(){
   </div>`).join('');
 }
 function setAnchorDate(ti,val){
+  if(val&&vbEstWeekEnd(val)){
+    val=vbLundiSiWeekEnd(val);
+    showNotification('📅 Date reportée au lundi '+val+' (week-end)');
+  }
   formTasks[ti].start_date=val||null;
-  if(val&&formTasks[ti].duration){const e=new Date(val);e.setDate(e.getDate()+(parseInt(formTasks[ti].duration)||0));formTasks[ti].end_date=e.toISOString().slice(0,10);}
+  if(val&&formTasks[ti].duration){const e=new Date(val);e.setDate(e.getDate()+(parseInt(formTasks[ti].duration)||0));formTasks[ti].end_date=vbLundiSiWeekEnd(e.toISOString().slice(0,10));}
   recalcPreview();
 }
 function recalcPreview(){
   for(let it=0;it<50;it++){let chg=false;
-    formTasks.forEach((t,i)=>{if(t.dep_task_idx==null)return;const dep=formTasks[parseInt(t.dep_task_idx)];if(!dep?.end_date)return;const ns=new Date(dep.end_date);ns.setDate(ns.getDate()+(parseInt(t.dep_offset)||0));const nss=ns.toISOString().slice(0,10);if(nss!==t.start_date){const d=parseInt(t.duration)||0;const ne=new Date(ns);ne.setDate(ne.getDate()+d);t.start_date=nss;t.end_date=ne.toISOString().slice(0,10);chg=true;}});if(!chg)break;}
+    formTasks.forEach((t,i)=>{if(t.dep_task_idx==null)return;const dep=formTasks[parseInt(t.dep_task_idx)];if(!dep?.end_date)return;const ns=new Date(dep.end_date);ns.setDate(ns.getDate()+(parseInt(t.dep_offset)||0));const nss=vbLundiSiWeekEnd(ns.toISOString().slice(0,10));if(nss!==t.start_date){const d=parseInt(t.duration)||0;const ne=new Date(nss);ne.setDate(ne.getDate()+d);t.start_date=nss;t.end_date=vbLundiSiWeekEnd(ne.toISOString().slice(0,10));chg=true;}});if(!chg)break;}
   renderFormTasks();
 }
 function addFormTask(){formTasks.push({name:'',who:'',category:'testing',duration:0,start_date:null,end_date:null,actual_start:null,actual_end:null,dep_task_idx:null,dep_offset:0});renderFormTasks();}
@@ -4547,6 +4571,12 @@ function renderFLEtape3New(p){
 const VB_GEMINI_ROOT = 'https://generativelanguage.googleapis.com/v1beta/models';
 const VB_GEMINI_MODEL = 'gemini-2.5-flash';
 const VB_GEMINI_KEY_STORAGE = 'vb_gemini_key';
+// Noms français des jalons, tels que l'utilisateur les prononce.
+const VB_MILESTONE_JALON_FR = {
+  installation: 'Installation mécanique',
+  mes: 'Mise en service (MES)',
+  pv_final: 'PV final / réception finale'
+};
 const VB_ASSISTANT_MAX_ALERTS = 60;   // au-delà, le contexte coûte cher sans rien apporter
 const VB_ASSISTANT_MAX_RESERVES = 40;
 const VB_ASSISTANT_MAX_MEMOIRE = 60;
@@ -4644,6 +4674,10 @@ function vbAssistantFacts(){
       debut: t.start_date || null,
       fin: t.end_date || null,
       categorie: t.category || null,
+      // Le jalon est décisif : les tâches sont souvent nommées en anglais (« Set up of the
+      // machine »), alors que l'utilisateur dit « la mise en service ». Sans ce tag, le
+      // modèle devrait deviner de quelle tâche il s'agit.
+      jalon: t.milestone ? (VB_MILESTONE_JALON_FR[t.milestone] || t.milestone) : null,
       depend_de: (t.dep_task_idx != null ? Number(t.dep_task_idx) : null)
     }))
   }));
@@ -4719,6 +4753,7 @@ Modifications de planning :
 - S'il annonce une nouvelle date pour une tâche, n'en parle pas au passé : produis une entrée dans "actions" de type "date", avec le "projet_id" et le "tache_index" repris de l'inventaire, et la nouvelle date de début en AAAA-MM-JJ.
 - Ne calcule PAS les conséquences du décalage : l'application recalcule elle-même les tâches dépendantes et te montrera le résultat. Contente-toi de désigner la tâche et sa nouvelle date.
 - Si l'année n'est pas précisée, déduis-la du champ "date_iso" ci-dessus en retenant l'occurrence la plus proche.
+- Les tâches portent souvent un nom anglais. Quand l'utilisateur parle d'un jalon — « mise en service », « MES », « installation », « PV final », « réception finale » — fie-toi au champ "jalon" de l'inventaire, pas au nom de la tâche.
 - Si tu hésites entre deux tâches ou deux projets, ne propose rien : demande lequel.
 - S'il réclame le planning en image, produis une action de type "gantt" avec le "projet_id".
 - Dans "reponse", annonce ce que tu proposes ; c'est lui qui validera.
@@ -4884,14 +4919,15 @@ function vbSimuleDecalage(p, ti, nouvelleDate){
   const avant = (p.tasks || []).map(x => ({ nom: x.name, debut: x.start_date, fin: x.end_date }));
 
   const ancienDebut = t.start_date;
+  const debut = vbLundiSiWeekEnd(nouvelleDate);
   if(ancienDebut && t.end_date){
     // On conserve la durée : décaler une tâche ne la raccourcit pas.
     const duree = Math.round((new Date(t.end_date) - new Date(ancienDebut)) / 86400000);
-    const fin = new Date(nouvelleDate);
+    const fin = new Date(debut);
     fin.setDate(fin.getDate() + duree);
-    t.end_date = fin.toISOString().slice(0, 10);
+    t.end_date = vbLundiSiWeekEnd(fin.toISOString().slice(0, 10));
   }
-  t.start_date = nouvelleDate;
+  t.start_date = debut;
   propagateDeps(copie, ti);
 
   const apres = copie.tasks.map(x => ({ nom: x.name, debut: x.start_date, fin: x.end_date }));
@@ -4930,8 +4966,13 @@ function vbAssistantProposer(actions){
       }) - 1;
 
       const cascade = sim.diff.filter(d => d.i !== ti);
+      const retenue = vbLundiSiWeekEnd(a.nouvelle_date);
       let detail = '<b>' + vbEsc(p.name) + '</b><br>' + vbEsc(t.name || 'Tâche') + ' : '
-        + '<span style="color:#888;text-decoration:line-through">' + vbEsc(sim.ancienDebut || '—') + '</span> → <b>' + vbEsc(a.nouvelle_date) + '</b>';
+        + '<span style="color:#888;text-decoration:line-through">' + vbEsc(sim.ancienDebut || '—') + '</span> → <b>' + vbEsc(retenue) + '</b>';
+      if(retenue !== a.nouvelle_date){
+        detail += '<div style="margin-top:5px;font-size:11px;color:#b45309">⚠️ Le ' + vbEsc(a.nouvelle_date)
+          + ' tombe un week-end : reporté au lundi.</div>';
+      }
       if(cascade.length){
         detail += '<div style="margin-top:6px;font-size:11px;color:var(--text2,#666)">'
           + cascade.length + ' tâche(s) dépendante(s) décalée(s) :<br>'
@@ -4997,18 +5038,19 @@ async function vbAssistantAppliquer(idx){
     const t = (p.tasks || [])[a.ti];
     if(!t){ vbAssistantFermerCarte(idx, '⚠️ Tâche introuvable', '#fca5a5'); return; }
     const ancien = t.start_date;
+    const debut = vbLundiSiWeekEnd(a.nouvelleDate);
 
     // snapshotAndIncrement archive l'état des tâches et incrémente l'indice de révision :
     // la modification est datée, commentée et réversible depuis l'historique du projet.
-    snapshotAndIncrement(p, 'Assistant : ' + (t.name || 'tâche') + ' ' + (ancien || '—') + ' → ' + a.nouvelleDate);
-
+    // Le commentaire porte la date réellement retenue, week-end déjà corrigé.
+    snapshotAndIncrement(p, 'Assistant : ' + (t.name || 'tâche') + ' ' + (ancien || '—') + ' → ' + debut);
     if(ancien && t.end_date){
       const duree = Math.round((new Date(t.end_date) - new Date(ancien)) / 86400000);
-      const fin = new Date(a.nouvelleDate);
+      const fin = new Date(debut);
       fin.setDate(fin.getDate() + duree);
-      t.end_date = fin.toISOString().slice(0, 10);
+      t.end_date = vbLundiSiWeekEnd(fin.toISOString().slice(0, 10));
     }
-    t.start_date = a.nouvelleDate;
+    t.start_date = debut;
     propagateDeps(p, a.ti);
     save();
 
