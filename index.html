@@ -899,6 +899,10 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
           <input type="text" class="form-input" id="cfg-gemini-model" autocomplete="off">
           <div style="font-size:11px;color:var(--text3,#999);margin-top:3px">Laisser vide pour le modèle par défaut. Google en retire régulièrement : si l'assistant signale qu'un modèle n'est plus disponible, il vous proposera le remplaçant.</div>
         </div>
+        <div class="form-group"><label class="form-label">Modèle de repli</label>
+          <input type="text" class="form-input" id="cfg-gemini-repli" autocomplete="off">
+          <div style="font-size:11px;color:var(--text3,#999);margin-top:3px">Essayé automatiquement si le modèle principal reste saturé. Un modèle plus léger est moins sollicité aux heures de pointe.</div>
+        </div>
       </div>
       <div style="margin-top:14px">
         <div style="font-size:12px;font-weight:600;margin-bottom:4px">🧠 Ce que l'assistant a retenu</div>
@@ -3343,6 +3347,9 @@ function initConfigPage(){
   const mdl=document.getElementById('cfg-gemini-model');
   mdl.value=vbGeminiModel()===VB_GEMINI_MODEL_DEFAUT?'':vbGeminiModel();
   mdl.placeholder=VB_GEMINI_MODEL_DEFAUT;
+  const rpl=document.getElementById('cfg-gemini-repli');
+  rpl.value=vbGeminiModelRepli()===VB_GEMINI_REPLI_DEFAUT?'':vbGeminiModelRepli();
+  rpl.placeholder=VB_GEMINI_REPLI_DEFAUT;
   vbRenderAssistantLists();
   document.getElementById('cfg-target-gap').value=config.targetGapDays;
   document.getElementById('cfg-alert-threshold').value=config.alertThreshold;
@@ -3360,7 +3367,7 @@ function renderTemplatesList(){const el=document.getElementById('templates-list'
   el.innerHTML=tpls.map((t,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg2);border-radius:6px;margin-bottom:8px"><span style="flex:1;font-size:13px;font-weight:500">${vbEsc(t.name)}</span><span style="font-size:11px;color:var(--text3)">${t.tasks.length} tâches</span><button class="btn btn-sm btn-danger" onclick="deleteTemplate(${i})">🗑</button></div>`).join('');}
 function addNewTemplate(){if(!config.templates)config.templates=JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));config.templates.push({id:'tpl_'+Date.now(),name:'Nouveau template',tasks:[]});renderTemplatesList();}
 function deleteTemplate(i){if(!confirm('Supprimer ?'))return;getTemplates().splice(i,1);renderTemplatesList();}
-function saveConfigPage(){vbGeminiSetKey(document.getElementById('cfg-gemini-key').value);vbGeminiSetModel(document.getElementById('cfg-gemini-model').value);config.appName=(document.getElementById('cfg-app-name').value||'').trim()||'VB-Factory';config.targetGapDays=parseInt(document.getElementById('cfg-target-gap').value)||5;config.alertThreshold=parseInt(document.getElementById('cfg-alert-threshold').value)||70;localStorage.setItem('kropp_config_v3',JSON.stringify(config));vbApplyAppName();if(typeof vbMarkDirty==='function')vbMarkDirty();showNotification('✅ Configuration enregistrée');showPage('dashboard');}
+function saveConfigPage(){vbGeminiSetKey(document.getElementById('cfg-gemini-key').value);vbGeminiSetModel(document.getElementById('cfg-gemini-model').value);vbGeminiSetModelRepli(document.getElementById('cfg-gemini-repli').value);config.appName=(document.getElementById('cfg-app-name').value||'').trim()||'VB-Factory';config.targetGapDays=parseInt(document.getElementById('cfg-target-gap').value)||5;config.alertThreshold=parseInt(document.getElementById('cfg-alert-threshold').value)||70;localStorage.setItem('kropp_config_v3',JSON.stringify(config));vbApplyAppName();if(typeof vbMarkDirty==='function')vbMarkDirty();showNotification('✅ Configuration enregistrée');showPage('dashboard');}
 
 // ── EXPORT ──
 function initExportPage(){
@@ -4579,8 +4586,12 @@ const VB_GEMINI_ROOT = 'https://generativelanguage.googleapis.com/v1beta/models'
 // Google retire régulièrement ses modèles. Le nom est donc réglable depuis Configuration :
 // une mise hors service ne doit pas exiger une intervention sur le code.
 const VB_GEMINI_MODEL_DEFAUT = 'gemini-3.6-flash';
+// Modèle de repli, essayé lorsque le principal reste saturé. Une génération plus légère
+// est moins sollicitée, donc plus souvent disponible aux heures de pointe.
+const VB_GEMINI_REPLI_DEFAUT = 'gemini-3.5-flash-lite';
 const VB_GEMINI_KEY_STORAGE = 'vb_gemini_key';
 const VB_GEMINI_MODEL_STORAGE = 'vb_gemini_model';
+const VB_GEMINI_REPLI_STORAGE = 'vb_gemini_repli';
 // Noms français des jalons, tels que l'utilisateur les prononce.
 const VB_MILESTONE_JALON_FR = {
   installation: 'Installation mécanique',
@@ -4594,7 +4605,16 @@ const VB_ASSISTANT_MAX_MEMOIRE = 60;
 function vbGeminiKey(){ try{ return localStorage.getItem(VB_GEMINI_KEY_STORAGE) || ''; }catch(e){ return ''; } }
 function vbGeminiSetKey(k){ try{ localStorage.setItem(VB_GEMINI_KEY_STORAGE, (k||'').trim()); }catch(e){} }
 function vbGeminiReady(){ return !!vbGeminiKey(); }
+let vbGeminiStatut = '';   // message transitoire affiché pendant les nouvelles tentatives
 function vbGeminiModel(){ try{ return localStorage.getItem(VB_GEMINI_MODEL_STORAGE) || VB_GEMINI_MODEL_DEFAUT; }catch(e){ return VB_GEMINI_MODEL_DEFAUT; } }
+function vbGeminiModelRepli(){ try{ return localStorage.getItem(VB_GEMINI_REPLI_STORAGE) || VB_GEMINI_REPLI_DEFAUT; }catch(e){ return VB_GEMINI_REPLI_DEFAUT; } }
+function vbGeminiSetModelRepli(m){
+  try{
+    const v=(m||'').trim();
+    if(v && v!==VB_GEMINI_REPLI_DEFAUT) localStorage.setItem(VB_GEMINI_REPLI_STORAGE, v);
+    else localStorage.removeItem(VB_GEMINI_REPLI_STORAGE);
+  }catch(e){}
+}
 function vbGeminiSetModel(m){
   try{
     const v=(m||'').trim();
@@ -4618,6 +4638,44 @@ async function vbGeminiBasculerModele(nom){
   vbAssistantPush('assistant', 'Modèle basculé sur « ' + nom +' ». Reposez votre question.');
 }
 
+// Une saturation Gemini (« high demand ») est presque toujours passagère : elle dure
+// quelques secondes. Abandonner au premier refus, c'est renvoyer l'utilisateur à un
+// message d'erreur pour un incident qui se serait résolu tout seul. On réessaie donc,
+// puis on tente le modèle de repli avant de renoncer.
+const VB_GEMINI_DELAIS = [1500, 4000, 9000];
+
+function vbGeminiSurcharge(status, msg){
+  return status === 503 || status === 500 || status === 429
+    || /high demand|overload|unavailable|try again later|please retry/i.test(msg || '');
+}
+
+async function vbGeminiAppelBrut(modele, corps, cle){
+  let rep;
+  try{
+    rep = await fetch(VB_GEMINI_ROOT + '/' + encodeURIComponent(modele) + ':generateContent?key=' + encodeURIComponent(cle), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps)
+    });
+  }catch(e){
+    const err = new Error('Connexion impossible. Vérifiez le réseau et réessayez.');
+    err.reseau = true;
+    throw err;
+  }
+  if(rep.ok) return await rep.json();
+
+  const detail = await rep.text().catch(() => '');
+  let msg = 'Erreur Gemini ' + rep.status;
+  try{ const j = JSON.parse(detail); if(j.error && j.error.message) msg = j.error.message; }catch(e){}
+  const err = new Error(msg);
+  err.status = rep.status;
+  err.brut = msg;
+  if(rep.status === 400 && /API key/i.test(msg)){ err.message = 'Clé Gemini refusée. Vérifiez-la dans Configuration.'; }
+  if(/no longer available|not found|deprecat/i.test(msg)){
+    err.message = 'Le modèle « ' + modele + ' » n’est plus disponible.';
+    err.modeleSuggere = vbGeminiModeleSuggere(msg);
+  }
+  throw err;
+}
+
 async function vbGeminiCall({ prompt, schema, history }){
   const cle = vbGeminiKey();
   if(!cle) throw new Error("Aucune clé Gemini enregistrée. Ouvrez Configuration pour l'ajouter.");
@@ -4632,38 +4690,45 @@ async function vbGeminiCall({ prompt, schema, history }){
     corps.generationConfig.responseSchema = schema;
   }
 
-  let rep;
-  try{
-    rep = await fetch(VB_GEMINI_ROOT + '/' + encodeURIComponent(vbGeminiModel()) + ':generateContent?key=' + encodeURIComponent(cle), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps)
-    });
-  }catch(e){
-    throw new Error('Connexion impossible. Vérifiez le réseau et réessayez.');
-  }
+  const modeles = [vbGeminiModel()];
+  const repli = vbGeminiModelRepli();
+  if(repli && repli !== modeles[0]) modeles.push(repli);
 
-  if(!rep.ok){
-    const detail = await rep.text().catch(() => '');
-    let msg = 'Erreur Gemini ' + rep.status;
-    try{ const j = JSON.parse(detail); if(j.error && j.error.message) msg = j.error.message; }catch(e){}
-    if(rep.status === 400 && /API key/i.test(msg)) msg = 'Clé Gemini refusée. Vérifiez-la dans Configuration.';
-    if(rep.status === 429) msg = 'Quota Gemini atteint. Réessayez dans quelques minutes.';
-    if(/no longer available|not found|deprecat/i.test(msg)){
-      const err = new Error('Le modèle « ' + vbGeminiModel() + ' » n’est plus disponible.');
-      err.modeleSuggere = vbGeminiModeleSuggere(msg);
-      err.detailGoogle = msg;
-      throw err;
+  let derniere = null;
+  for(let m = 0; m < modeles.length; m++){
+    for(let essai = 0; essai <= VB_GEMINI_DELAIS.length; essai++){
+      try{
+        const json = await vbGeminiAppelBrut(modeles[m], corps, cle);
+        const texte = (json.candidates || [])
+          .flatMap(c => (c.content && c.content.parts) || [])
+          .map(p => p.text || '').join('');
+        if(!texte.trim()) throw new Error("L'assistant n'a rien renvoyé. Reformulez votre question.");
+        if(m > 0) showNotification('ℹ️ Réponse obtenue via le modèle de repli');
+        if(!schema) return texte;
+        try{ return JSON.parse(texte); }
+        catch(e){ throw new Error("Réponse illisible de l'assistant."); }
+      }catch(e){
+        derniere = e;
+        const rejouable = e.reseau || vbGeminiSurcharge(e.status, e.brut);
+        if(!rejouable) throw e;                      // clé refusée, modèle retiré : inutile d'insister
+        if(essai === VB_GEMINI_DELAIS.length) break; // on passe au modèle suivant
+        vbGeminiStatut = 'Modèle saturé — nouvelle tentative ' + (essai + 1) + '/' + VB_GEMINI_DELAIS.length + '…';
+        if(typeof vbAssistantRender === 'function') vbAssistantRender();
+        await new Promise(r => setTimeout(r, VB_GEMINI_DELAIS[essai]));
+      }finally{
+        vbGeminiStatut = '';
+      }
     }
-    throw new Error(msg);
   }
 
-  const json = await rep.json();
-  const texte = (json.candidates || [])
-    .flatMap(c => (c.content && c.content.parts) || [])
-    .map(p => p.text || '').join('');
-  if(!texte.trim()) throw new Error("L'assistant n'a rien renvoyé. Reformulez votre question.");
-  if(!schema) return texte;
-  try{ return JSON.parse(texte); }
-  catch(e){ throw new Error("Réponse illisible de l'assistant."); }
+  const err = derniere || new Error('Appel Gemini impossible.');
+  if(vbGeminiSurcharge(err.status, err.brut)){
+    err.message = 'Gemini est saturé en ce moment. J’ai réessayé '
+      + VB_GEMINI_DELAIS.length + ' fois' + (modeles.length > 1 ? ', y compris avec le modèle de repli' : '')
+      + ', sans succès. Réessayez dans quelques minutes.';
+    err.saturation = true;
+  }
+  throw err;
 }
 
 // ─── Les faits, calculés par l'application ───
@@ -4883,7 +4948,9 @@ function vbAssistantRender(){
       + 'border-radius:12px 12px 12px 3px;max-width:92%">' + corps + '</div></div>';
   }).join('');
   if(vbAssistantBusy){
-    box.innerHTML += '<div style="color:var(--text3,#999);font-size:12px;font-style:italic">L’assistant réfléchit…</div>';
+    const etat = vbGeminiStatut || 'L’assistant réfléchit…';
+    const couleur = vbGeminiStatut ? '#b45309' : 'var(--text3,#999)';
+    box.innerHTML += '<div style="color:' + couleur + ';font-size:12px;font-style:italic">' + vbEsc(etat) + '</div>';
   }
   box.scrollTop = box.scrollHeight;
 }
