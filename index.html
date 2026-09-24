@@ -305,6 +305,7 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
   /* Masquer la nav latérale sur mobile */
   nav{display:none!important}
 
+
   /* Barre de navigation bottom fixe */
   #mobile-nav{
     display:flex!important;
@@ -465,6 +466,35 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
 }
 
 /* Masquer la nav bottom sur desktop */
+/* ── SÉLECTEUR DE MODE (Démo / Production) ── */
+/* Il vivait en position:fixed en bas à gauche, où il recouvrait la barre de navigation
+   mobile. Il est désormais posé dans le flux : barre latérale sur écran large, onglet
+   « Plus » sur mobile. Le mode actif est signalé par la couleur, ce qui a permis de
+   supprimer la bannière jaune qui masquait le haut de la page. */
+.vb-mode-slot{padding:10px 8px 4px}
+.vb-mode-slot-mobile{display:none}
+.vb-mode-pill{display:flex;align-items:center;justify-content:center;gap:7px;
+  background:var(--bg2,#fff);border:0.5px solid var(--border,#ddd);
+  border-radius:24px;padding:5px 8px;font-size:11px;font-weight:600}
+.vb-mode-label{padding:3px 8px;border-radius:12px;cursor:help;color:var(--text3,#8a8a85);
+  transition:background 0.15s,color 0.15s;white-space:nowrap}
+.vb-mode-label.on-demo{background:#fde68a;color:#92400e;box-shadow:0 0 0 1px #d97706 inset}
+.vb-mode-label.on-prod{background:#dcfce7;color:#166534;box-shadow:0 0 0 1px #16a34a inset}
+.vb-mode-switch{position:relative;width:38px;height:20px;border-radius:12px;border:none;
+  cursor:pointer;padding:0;flex:none;transition:background 0.15s}
+.vb-mode-knob{position:absolute;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,0.3);transition:left 0.15s}
+.vb-mode-help{border:none;background:none;cursor:help;color:var(--text3,#8a8a85);
+  font-size:11px;padding:0 2px;line-height:1}
+#vb-mode-tip{position:fixed;z-index:10002;max-width:270px;background:#2c2c2a;color:#f5f5f0;
+  padding:9px 11px;border-radius:7px;font-size:11px;font-weight:400;line-height:1.5;
+  box-shadow:0 4px 16px rgba(0,0,0,0.28);pointer-events:none;display:none}
+#vb-mode-tip b{color:#fff}
+/* Déclaré APRÈS la règle de base : sur mobile la barre latérale est masquée,
+   le sélecteur se replie dans l'onglet « Plus ». */
+@media(max-width:768px){
+  .vb-mode-slot-mobile{display:block;margin-bottom:14px}
+}
 #mobile-nav,#mobile-save-btn{display:none}
 @media print{
   nav{display:none}
@@ -476,11 +506,6 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
 </head>
 <body>
 <div id="vb-app-root">
-<!-- ═══ BANNIÈRE DÉMO ═══ -->
-<div id="vb-demo-banner" style="position:fixed;top:0;left:0;right:0;background:linear-gradient(90deg,#fef3c7,#fde68a);border-bottom:2px solid #d97706;padding:10px 24px;z-index:9999;font-size:12px;font-weight:600;color:#92400e;display:none;align-items:center;justify-content:space-between">
-  <div>🎬 <strong>MODE DÉMO</strong> — 14 projets • 20 techniciens • 2 CA • Cliquez 🔄 pour basculer Manager ↔ CA</div>
-  <button onclick="this.parentElement.style.display='none'" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;color:inherit">✕</button>
-</div>
 <!-- ── BARRE NAV MOBILE BOTTOM ── -->
 <div id="mobile-nav">
   <button class="mob-nav-btn active" id="mob-nav-dashboard" onclick="showPage('dashboard');updateMobNav('dashboard')">
@@ -523,6 +548,7 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
       <span class="nav-icon">💾</span><span>Sauvegarder</span>
     </button>
     <div id="last-save-info" style="font-size:11px;color:var(--text3);padding:6px 10px;text-align:center;border-top:0.5px solid var(--border);margin-top:6px">💾 Dernière : jamais</div>
+    <div id="vb-mode-slot" class="vb-mode-slot"></div>
   </div>
   <div class="nav-footer">VB-Factory</div>
 </nav>
@@ -942,6 +968,10 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
   <div class="page-header"><div class="page-title">Export / Import</div></div>
   <div style="max-width:720px">
 
+    <!-- Sur mobile la barre latérale est masquée : le sélecteur de mode se replie ici,
+         dans l'onglet « Plus », plutôt que de flotter au-dessus de la barre du bas. -->
+    <div id="vb-mode-slot-mobile" class="vb-mode-slot vb-mode-slot-mobile"></div>
+
     <div class="export-section">
       <div style="font-size:14px;font-weight:600;margin-bottom:12px">🖨️ Impression PDF</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -959,7 +989,8 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
       </div>
       <div style="font-size:12px;color:#7c3aed;margin-bottom:12px">
         Une copie horodatée est déposée automatiquement dans <b>VB-Factory/backups/</b> au premier
-        enregistrement de chaque journée. Les <b id="vb-drive-retention-label">30</b> plus récentes sont conservées.
+        enregistrement de chaque journée, ainsi qu'<b>avant chaque import ou remise à zéro</b>
+        (fichiers <b>vb-factory-avant-…</b>). Les <b id="vb-drive-retention-label">30</b> plus récentes sont conservées.
       </div>
 
       <div id="vb-backup-list" style="background:#fff;border:1px solid #e9d5ff;border-radius:8px;overflow:hidden">
@@ -1334,6 +1365,32 @@ async function vbDriveRenderBackupList(){
   }
 }
 
+// Point de restauration créé AVANT une opération destructrice (import, remise à zéro).
+// En production uniquement : en démo rien n'atteint Drive, la sauvegarde n'aurait pas de sens.
+// Renvoie true si l'opération peut se poursuivre, false si l'utilisateur préfère renoncer.
+async function vbDriveBackupAvantOperation(libelle){
+  if(typeof vbGetMode === 'function' && vbGetMode() !== 'production') return true;
+  if(!vbDriveReady || !vbDriveIds.fileId || !vbDriveIds.backupsId){
+    return confirm('Aucune sauvegarde préalable n\'a pu être créée : Google Drive n\'est pas connecté.\n\n'
+      + 'L\'opération « ' + libelle + ' » modifiera vos données sans point de restauration.\n\nContinuer quand même ?');
+  }
+  try{
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    await vbDriveUploadNow();   // on archive l'état d'avant, pas un état périmé
+    await vbDriveFetch(VB_DRIVE_API + '/files/' + vbDriveIds.fileId + '/copy?fields=id', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'vb-factory-avant-' + stamp + '.json', parents: [vbDriveIds.backupsId] })
+    });
+    vbDrivePruneBackups().catch(() => {});
+    showNotification('🛟 Point de restauration créé avant : ' + libelle, 3500);
+    return true;
+  }catch(e){
+    return confirm('La sauvegarde préalable a échoué (' + e.message + ').\n\n'
+      + 'L\'opération « ' + libelle + ' » modifierait vos données sans point de restauration.\n\nContinuer quand même ?');
+  }
+}
+
 async function vbDriveBackupNow(){
   if(!vbDriveReady){ showNotification('⚠️ Connectez-vous à Google d\'abord'); return; }
   try{
@@ -1364,6 +1421,8 @@ async function vbDriveDownloadBackup(fileId, name){
 
 async function vbDriveRestoreBackup(fileId, name){
   if(!confirm('Restaurer « ' + name + ' » ?\n\nToutes les données actuelles seront remplacées par celles de cette sauvegarde.')) return;
+  // L'état courant est lui aussi archivé : se tromper de sauvegarde reste rattrapable.
+  if(!await vbDriveBackupAvantOperation('restauration de « ' + name + ' »')) return;
   try{
     const res = await vbDriveFetch(VB_DRIVE_API + '/files/' + fileId + '?alt=media');
     const doc = await res.json();
@@ -3426,11 +3485,13 @@ function exportFullBackup(){
   showNotification('✅ Backup exporté — '+projects.length+' projets');
 }
 
-function importFullBackup(){
+async function importFullBackup(){
   const f=document.getElementById('import-full-file');
   const res=document.getElementById('import-full-result');
   if(!f?.files.length){alert('Sélectionne un fichier JSON.');return;}
   const conflict=document.querySelector('input[name="import-conflict"]:checked')?.value||'skip';
+  // Un import fusionne dans les données réelles et part aussitôt dans Drive : on pose d'abord un filet.
+  if(!await vbDriveBackupAvantOperation('import d\'un backup complet')) return;
   const reader=new FileReader();
   reader.onload=e=>{
     try{
@@ -3481,10 +3542,11 @@ function importFullBackup(){
   reader.readAsText(f.files[0]);
 }
 
-function importLegacyBackup(){
+async function importLegacyBackup(){
   const f=document.getElementById('import-legacy-file');
   const res=document.getElementById('import-legacy-result');
   if(!f?.files.length){alert('Sélectionne un fichier JSON.');return;}
+  if(!await vbDriveBackupAvantOperation('import d\'un backup legacy')) return;
   const reader=new FileReader();
   reader.onload=e=>{
     try{
@@ -3520,9 +3582,10 @@ function importLegacyBackup(){
   reader.readAsText(f.files[0]);
 }
 
-function resetAllProjects(){
-  if(!confirm('Supprimer TOUS les projets du localStorage ?'))return;
-  if(!confirm('Confirmation finale — cette action est irréversible (le fichier backup JSON n\'est pas affecté).'))return;
+async function resetAllProjects(){
+  if(!confirm('Supprimer TOUS les projets ?'))return;
+  if(!confirm('Confirmation finale.\n\nUn point de restauration va être déposé dans Drive juste avant : vous pourrez revenir en arrière depuis la liste des sauvegardes.'))return;
+  if(!await vbDriveBackupAvantOperation('remise à zéro des projets')) return;
   projects=[];save();
   showPage('dashboard');
   showNotification('🗑 Tous les projets supprimés',2000);
@@ -7450,25 +7513,88 @@ function vbSwitchMode(newMode){
   location.reload();
 }
 
+// Les deux modes expliqués au survol : ce qui est affiché, et surtout ce qui arrive
+// aux données. C'est cette info-bulle qui remplace la bannière jaune permanente.
+const VB_MODE_AIDE = {
+  demo: '<b>Mode Démo</b><br>Projets fictifs, pour présenter l\'application.<br><br>'
+      + 'Vos saisies ne sont <b>jamais</b> envoyées dans Google Drive et disparaissent au rechargement '
+      + 'de la page. Vos vraies données restent intactes.<br><br>'
+      + 'Idéal pour essayer une manipulation sans risque.',
+  production: '<b>Mode Production</b><br>Vos vraies affaires.<br><br>'
+      + 'Chaque modification part dans Google Drive en quelques secondes.<br><br>'
+      + 'Filets de sécurité : une sauvegarde automatique par jour (30 conservées), '
+      + 'un point de restauration créé avant chaque import ou remise à zéro, '
+      + 'et l\'historique de versions de Google Drive.'
+};
+
+function vbModeTipEl(){
+  let t = document.getElementById('vb-mode-tip');
+  if(!t){ t = document.createElement('div'); t.id = 'vb-mode-tip'; document.body.appendChild(t); }
+  return t;
+}
+// Positionnement en position:fixed calculé à la volée : la barre latérale est en
+// overflow:auto, une info-bulle en position:absolute y serait rognée.
+function vbModeTipShow(ancre, cle){
+  const t = vbModeTipEl();
+  t.innerHTML = VB_MODE_AIDE[cle] || '';
+  t.style.display = 'block';
+  const r = ancre.getBoundingClientRect();
+  const h = t.offsetHeight, w = t.offsetWidth;
+  let top = r.top - h - 8;
+  if(top < 8) top = Math.min(r.bottom + 8, window.innerHeight - h - 8); // pas de place au-dessus
+  let left = r.left + r.width / 2 - w / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+  t.style.top = top + 'px';
+  t.style.left = left + 'px';
+}
+function vbModeTipHide(){
+  const t = document.getElementById('vb-mode-tip');
+  if(t){ t.style.display = 'none'; t.dataset.pour = ''; t.dataset.epingle = ''; }
+}
+// Fermeture au départ du survol uniquement : une info-bulle ouverte volontairement
+// (clic ou appui) ne doit pas se refermer toute seule. C'est indispensable sur mobile,
+// où Chrome émet un mouseleave juste après le clic qu'il synthétise depuis le toucher.
+function vbModeTipHideSurvol(){
+  const t = document.getElementById('vb-mode-tip');
+  if(t && t.dataset.epingle !== '1') vbModeTipHide();
+}
+// Sur mobile il n'y a pas de survol, et un appui ne donne pas le focus à un <span> :
+// l'explication resterait inatteignable au doigt. L'appui l'ouvre donc explicitement.
+function vbModeTipToggle(ancre, cle){
+  const t = vbModeTipEl();
+  if(t.style.display === 'block' && t.dataset.pour === cle && t.dataset.epingle === '1'){ vbModeTipHide(); return; }
+  vbModeTipShow(ancre, cle);
+  t.dataset.pour = cle;
+  t.dataset.epingle = '1';
+}
+document.addEventListener('click', e => {
+  if(!e.target.closest || !e.target.closest('.vb-mode-label')) vbModeTipHide();
+});
+
+function vbModePillHtml(isDemo){
+  const att = cle => 'onmouseenter="vbModeTipShow(this,\'' + cle + '\')" onmouseleave="vbModeTipHideSurvol()" '
+                   + 'onfocus="vbModeTipShow(this,\'' + cle + '\')" onblur="vbModeTipHideSurvol()" '
+                   + 'onclick="vbModeTipToggle(this,\'' + cle + '\')" tabindex="0" role="button"';
+  return '<div class="vb-mode-pill">'
+    + '<span class="vb-mode-label ' + (isDemo ? 'on-demo' : '') + '" ' + att('demo') + '>Démo</span>'
+    + '<button class="vb-mode-switch" onclick="vbSwitchMode(\'' + (isDemo ? 'production' : 'demo') + '\')"'
+    + ' title="Basculer de mode" aria-label="Basculer entre Démo et Production"'
+    + ' style="background:' + (isDemo ? '#d97706' : '#16a34a') + '">'
+    + '<span class="vb-mode-knob" style="left:' + (isDemo ? '2px' : '20px') + '"></span>'
+    + '</button>'
+    + '<span class="vb-mode-label ' + (isDemo ? '' : 'on-prod') + '" ' + att('production') + '>Production</span>'
+    + '</div>';
+}
+
 function vbRenderModeBadge(){
-  const mode = vbGetMode();
-  const isDemo = mode==='demo';
-  // La bannière jaune n'a de sens qu'en démo : affichée en production elle annonçait un
-  // mode faux et recouvrait le titre de la barre latérale.
-  const banner = document.getElementById('vb-demo-banner');
-  if(banner) banner.style.display = isDemo ? 'flex' : 'none';
-  const el = document.createElement('div');
-  el.id = 'vb-mode-badge';
-  el.style.cssText = 'position:fixed;bottom:14px;left:14px;z-index:10001;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--border,#ddd);padding:6px 10px;border-radius:24px;font-size:11px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.12);font-family:-apple-system,BlinkMacSystemFont,sans-serif';
-  el.innerHTML = `
-    <span style="color:${isDemo?'#92400e':'#555'}">Démo</span>
-    <button id="vb-mode-toggle-switch" onclick="vbSwitchMode('${isDemo?'production':'demo'}')"
-      style="position:relative;width:38px;height:20px;border-radius:12px;border:none;cursor:pointer;padding:0;background:${isDemo?'#d97706':'#c7c7c7'};transition:background 0.15s">
-      <span style="position:absolute;top:2px;left:${isDemo?'20px':'2px'};width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);transition:left 0.15s"></span>
-    </button>
-    <span style="color:${!isDemo?'#166534':'#555'}">Production</span>
-  `;
-  document.body.appendChild(el);
+  const isDemo = vbGetMode() === 'demo';
+  const html = vbModePillHtml(isDemo);
+  // Deux emplacements, un seul visible à la fois (CSS) : barre latérale et onglet « Plus ».
+  ['vb-mode-slot', 'vb-mode-slot-mobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = html;
+  });
+  vbModeTipHide();
 }
 
 async function vbInit() {
