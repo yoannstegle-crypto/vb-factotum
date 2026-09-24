@@ -5654,6 +5654,242 @@ function vbCopyIdees(){
 // ================================================================
 
 // Mapping cellules FT → champs VB Factory
+// ═══════════════════════════════════════════════════════════════════════════
+// LECTURE DE FICHE TECHNIQUE — extraction sémantique
+// ═══════════════════════════════════════════════════════════════════════════
+// L'ancien import (FT_CELL_MAP, plus bas) lit des cellules fixes de l'onglet
+// « HDV - Auto ». Sur une autre machine ces cellules existent toujours mais
+// contiennent autre chose : E121 vaut « tension » sur une HDV, « Emetteur » sur
+// une grenailleuse RRB et « Diamètre » sur une VPX 250-XD. L'import ne se
+// contentait donc pas d'échouer, il importait des libellés d'en-tête pris pour
+// des valeurs. Les lignes bougent d'un modèle à l'autre :
+//   tension       → E121 (Otavske) / E42 (Dexis) / E48 (RRB)
+//   nature du sol → E128 (Otavske) / E85 (Dexis) / E56 (RRB)
+// On ne lit donc plus de position : on rend la feuille en lignes lisibles, le
+// modèle désigne les valeurs, et chaque réponse est revérifiée contre la
+// cellule qu'il a citée.
+
+// Un onglet décrit une machine si (a) il est visible — les modèles non vendus
+// sont masqués dans la trame commerciale — ET (b) il porte la signature d'un
+// en-tête de FT : type de machine (D5), désignation (F5) et indice (O5).
+// Aucun des deux critères ne suffit seul : sur la trame à 3 machines, la
+// visibilité seule retient 5 onglets (dont « brouillon » et un onglet de suivi),
+// la signature seule en retient 10 (tous les modèles masqués du catalogue).
+const VB_FT_SIGNATURE = ['D5', 'F5', 'O5'];
+
+function vbFtValeurBrute(ws, adr) {
+  const c = ws && ws[adr];
+  if (!c || c.v === null || c.v === undefined) return null;
+  const t = String(c.v).trim();
+  return t === '' ? null : t;
+}
+
+function vbFtOngletsMachines(XLSX, wb) {
+  const meta = (wb.Workbook && wb.Workbook.Sheets) || [];
+  return wb.SheetNames.map((nom, i) => {
+    const masque = !!(meta[i] && meta[i].Hidden);
+    const ws = wb.Sheets[nom];
+    const signature = VB_FT_SIGNATURE.every(a => vbFtValeurBrute(ws, a));
+    return { nom, masque, signature, retenu: !masque && signature };
+  });
+}
+
+function vbFtTexteCellule(c) {
+  if (!c) return '';
+  const v = c.v;
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (typeof v === 'boolean') return v ? 'oui' : 'non';
+  return String(v).replace(/\s*\n\s*/g, ' / ').replace(/\s+/g, ' ').trim();
+}
+
+// Dans ces fiches une case à cocher vaut « ☑☐ » : les deux glyphes côte à côte,
+// c'est-à-dire un choix qui n'a PAS été tranché. Un seul glyphe est une réponse.
+// Sans cette distinction, une case intacte se lit comme un « oui ».
+function vbFtEtatCase(t) {
+  const coches = (t.match(/[☑☒✓✔]/g) || []).length;
+  const vides  = (t.match(/[☐□]/g) || []).length;
+  if (!coches && !vides) return null;
+  if (coches && vides) return 'non tranché';
+  return coches ? 'coché' : 'décoché';
+}
+
+const VB_FT_A_DEFINIR = /^(à\s*d[ée]finir|a\s*definir|\?+|tbd|à\s*confirmer|non\s*d[ée]fini|non\s*pr[ée]cis[ée])/i;
+
+// Rendu d'une feuille en lignes « 121: [C121] tension : [E121] standard : 400V ».
+// Le libellé et sa valeur se retrouvent côte à côte sur la même ligne, ce qui rend
+// l'association lisible sans avoir à deviner une géométrie.
+function vbFtLignesFeuille(XLSX, ws, opts) {
+  opts = opts || {};
+  const ref = ws && ws['!ref'];
+  if (!ref) return { lignes: [], aDefinir: [] };
+  const plage = XLSX.utils.decode_range(ref);
+  const finCol = Math.min(plage.e.c, opts.maxCol || 40);   // au-delà : colonnes parasites (jusqu'à XFD)
+  const finLig = Math.min(plage.e.r, (opts.maxLignes || 400) - 1);
+  const lignes = [], aDefinir = [];
+  for (let r = plage.s.r; r <= finLig; r++) {
+    const bouts = [];
+    for (let c = plage.s.c; c <= finCol; c++) {
+      const adr = XLSX.utils.encode_cell({ r, c });
+      const t = vbFtTexteCellule(ws[adr]);
+      if (!t) continue;
+      const etat = vbFtEtatCase(t);
+      bouts.push('[' + adr + '] ' + (etat ? t + ' («' + etat + '»)' : t));
+      if (VB_FT_A_DEFINIR.test(t)) aDefinir.push({ cellule: adr, texte: t });
+    }
+    if (bouts.length) lignes.push((r + 1) + ': ' + bouts.join('  '));
+  }
+  return { lignes, aDefinir };
+}
+
+// Lecture complète : les machines en portée, l'onglet Résumé et la liste de
+// suivi interne. Un seul fichier peut décrire plusieurs affaires.
+function vbFtAnalyserClasseur(XLSX, wb) {
+  const onglets = vbFtOngletsMachines(XLSX, wb);
+  const machines = onglets.filter(o => o.retenu).map(o => {
+    const ws = wb.Sheets[o.nom];
+    const { lignes, aDefinir } = vbFtLignesFeuille(XLSX, ws);
+    return {
+      onglet: o.nom,
+      entete: {
+        type_machine: vbFtValeurBrute(ws, 'D2'),
+        modele:       vbFtValeurBrute(ws, 'F5'),
+        client:       vbFtValeurBrute(ws, 'I2'),
+        num_affaire:  vbFtValeurBrute(ws, 'N2'),
+        pays_ville:   vbFtValeurBrute(ws, 'J5'),
+        indice_ft:    vbFtValeurBrute(ws, 'O5')
+      },
+      lignes, aDefinir
+    };
+  });
+  const nomResume = wb.SheetNames.find(n => /^r[ée]sum[ée]/i.test(n.trim()));
+  const nomSuivi  = wb.SheetNames.find(n => /action item/i.test(n));
+  return {
+    machines,
+    onglets,
+    resume: nomResume ? vbFtLignesFeuille(XLSX, wb.Sheets[nomResume], { maxCol: 12, maxLignes: 60 }).lignes : null,
+    resume_onglet: nomResume || null,
+    suivi_onglet: nomSuivi || null
+  };
+}
+
+// ─── Champs recherchés dans une fiche technique ───
+// Le libellé sert à l'écran de confirmation, l'indice guide le modèle. Aucun de
+// ces champs n'est associé à une position : c'est tout l'objet de la réécriture.
+const VB_FT_CHAMPS = [
+  { cle:'client',            libelle:'Client',                 indice:"raison sociale du client" },
+  { cle:'num_affaire',       libelle:'N° d’affaire',           indice:"numéro d'affaire Vernet Behringer" },
+  { cle:'type_machine',      libelle:'Type de machine',        indice:"famille : HDX, HDL, HDV, HDS, VPX, grenailleuse…" },
+  { cle:'designation',       libelle:'Désignation',            indice:"modèle complet, ex. HBE 520/1026G 60°/60°" },
+  { cle:'ville',             libelle:'Ville',                  indice:"ville d'installation" },
+  { cle:'pays',              libelle:'Pays',                   indice:"pays d'installation" },
+  { cle:'metier_client',     libelle:'Métier du client',       indice:"activité principale" },
+  { cle:'langue_client',     libelle:'Langue du client',       indice:"langue de communication" },
+  { cle:'contact_tech',      libelle:'Contact technique',      indice:"nom du contact technique chez le client" },
+  { cle:'ingenieur_com',     libelle:'Ingénieur commercial',   indice:"IC Vernet Behringer" },
+  { cle:'charge_affaires',   libelle:'Chargé d’affaires',      indice:"CA Vernet Behringer" },
+  { cle:'delai_contractuel', libelle:'Délai contractuel',      indice:"date ou délai de livraison au contrat" },
+  { cle:'incoterm',          libelle:'Incoterm',               indice:"EXW, FCA, DAP, DDP, CIF, FRANCO…" },
+  { cle:'penalites',         libelle:'Pénalités de retard',    indice:"clause de pénalités" },
+  { cle:'tension',           libelle:'Tension',                indice:"tension d'alimentation, ex. 400V triphasé" },
+  { cle:'frequence',         libelle:'Fréquence',              indice:"fréquence réseau, ex. 50 Hz" },
+  { cle:'regime_neutre',     libelle:'Régime de neutre',       indice:"TT, TN-S, IT…" },
+  { cle:'nature_sol',        libelle:'Nature du sol',          indice:"béton, dallage…" },
+  { cle:'etat_sol',          libelle:'État du sol',            indice:"bon, moyen, à reprendre…" },
+  { cle:'temp_mini',         libelle:'Température mini',       indice:"température minimale de l'atelier" },
+  { cle:'temp_maxi',         libelle:'Température maxi',       indice:"température maximale de l'atelier" },
+  { cle:'moyen_transport',   libelle:'Moyen de transport',     indice:"camion, bateau…" },
+  { cle:'duree_formation',   libelle:'Durée de formation',     indice:"nombre de jours de formation" },
+  { cle:'nb_personnes_form', libelle:'Personnes à former',     indice:"effectif à former" },
+  { cle:'langue_formation',  libelle:'Langue de formation',    indice:"langue de la formation" },
+  { cle:'langue_docs',       libelle:'Langue de la doc',       indice:"langue de la documentation" },
+  { cle:'duree_garantie',    libelle:'Durée de garantie',      indice:"durée de garantie contractuelle" }
+];
+
+const VB_FT_SCHEMA = {
+  type: 'object',
+  properties: {
+    champs: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          cle:     { type: 'string' },
+          valeur:  { type: 'string' },
+          cellule: { type: 'string' },
+          libelle_source: { type: 'string' },
+          etat:    { type: 'string', enum: ['renseigne', 'a_definir'] }
+        },
+        required: ['cle', 'valeur', 'cellule', 'etat']
+      }
+    }
+  },
+  required: ['champs']
+};
+
+function vbFtPrompt(machine) {
+  return 'Tu lis une fiche technique Vernet Behringer rendue ligne par ligne. Chaque valeur est\n'
+    + 'précédée de sa référence de cellule entre crochets.\n\n'
+    + 'Règles impératives :\n'
+    + '- Ne retiens une valeur que si un libellé de la MÊME LIGNE (ou juste au-dessus) la justifie.\n'
+    + '- Ne déduis JAMAIS une valeur de sa position : les lignes changent d\'un modèle de machine à l\'autre.\n'
+    + '- « cellule » doit être la référence exacte d\'où vient la valeur, telle qu\'écrite entre crochets.\n'
+    + '- « libelle_source » est le libellé qui t\'a fait retenir cette valeur, recopié tel quel.\n'
+    + '- Si la valeur est « à définir », « ? », « à confirmer » : etat = "a_definir" et recopie ce texte.\n'
+    + '- Si un champ est absent de la fiche, NE L\'INCLUS PAS. Ne devine pas, n\'invente pas.\n'
+    + '- Une case notée « non tranché » n\'est PAS une réponse : ignore-la.\n\n'
+    + 'Champs recherchés :\n'
+    + VB_FT_CHAMPS.map(c => '- ' + c.cle + ' : ' + c.indice).join('\n')
+    + '\n\nOnglet « ' + machine.onglet + ' » :\n' + machine.lignes.join('\n');
+}
+
+// Garde-fou contre l'invention : toute valeur doit se retrouver dans la cellule
+// citée. Le modèle désigne, il ne crée pas. Une valeur qui ne se vérifie pas
+// n'est pas jetée en silence — elle est signalée comme telle à l'écran.
+function vbFtNormaliser(t) {
+  return String(t || '').toLowerCase().replace(/[\s ]+/g, ' ')
+    .replace(/[«»"'’,;:()]/g, '').trim();
+}
+
+function vbFtVerifier(XLSX, ws, champs) {
+  return (champs || []).map(c => {
+    const def = VB_FT_CHAMPS.find(d => d.cle === c.cle);
+    const brut = vbFtTexteCellule(ws[c.cellule]);
+    const a = vbFtNormaliser(c.valeur), b = vbFtNormaliser(brut);
+    let controle = 'absente';
+    if (b) {
+      if (a === b) controle = 'exacte';
+      else if (b.includes(a) || a.includes(b)) controle = 'extraite';
+      else controle = 'divergente';
+    }
+    return {
+      cle: c.cle,
+      libelle: def ? def.libelle : c.cle,
+      valeur: c.valeur,
+      cellule: c.cellule,
+      libelle_source: c.libelle_source || '',
+      etat: c.etat === 'a_definir' ? 'a_definir' : 'renseigne',
+      contenu_cellule: brut,
+      controle,                       // exacte | extraite | divergente | absente
+      fiable: controle === 'exacte' || controle === 'extraite',
+      connu: !!def
+    };
+  });
+}
+
+async function vbFtExtraireMachine(XLSX, wb, machine) {
+  const rep = await vbGeminiCall({ prompt: vbFtPrompt(machine), schema: VB_FT_SCHEMA });
+  const champs = vbFtVerifier(XLSX, wb.Sheets[machine.onglet], rep && rep.champs);
+  return {
+    onglet: machine.onglet,
+    entete: machine.entete,
+    champs,
+    retenus: champs.filter(c => c.fiable && c.etat === 'renseigne' && c.connu),
+    a_definir: champs.filter(c => c.etat === 'a_definir'),
+    rejetes: champs.filter(c => !c.fiable || !c.connu),
+    a_definir_feuille: machine.aDefinir
+  };
+}
+
 const FT_CELL_MAP = {
   // Identité
   client:              { sheet: 'HDV - Auto', cell: 'I2' },
