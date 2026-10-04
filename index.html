@@ -495,6 +495,15 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
 @media(max-width:768px){
   .vb-mode-slot-mobile{display:block;margin-bottom:14px}
 }
+/* ── BANDEAU BAC À SABLE ── */
+#vb-sandbox-bar{position:fixed;top:0;left:0;right:0;height:26px;z-index:10050;
+  background:repeating-linear-gradient(45deg,#3C3489,#3C3489 12px,#4a4199 12px,#4a4199 24px);
+  color:#fff;font-size:11px;font-weight:600;display:none;align-items:center;
+  justify-content:center;gap:8px;letter-spacing:0.02em}
+body.vb-sandbox #vb-sandbox-bar{display:flex}
+body.vb-sandbox nav{top:26px;height:calc(100vh - 26px)}
+body.vb-sandbox main{padding-top:26px}
+body.vb-sandbox #mobile-nav{bottom:0}
 #mobile-nav,#mobile-save-btn{display:none}
 @media print{
   nav{display:none}
@@ -506,6 +515,7 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
 </head>
 <body>
 <div id="vb-app-root">
+<div id="vb-sandbox-bar">BAC À SABLE — dossier Drive « VB-Factory-essai » · vos données de production ne sont pas touchées</div>
 <!-- ── BARRE NAV MOBILE BOTTOM ── -->
 <div id="mobile-nav">
   <button class="mob-nav-btn active" id="mob-nav-dashboard" onclick="showPage('dashboard');updateMobNav('dashboard')">
@@ -1096,16 +1106,28 @@ const VB_GOOGLE_CLIENT_ID = '858850894263-hhll03e1mrq7pprf9u54mfka0vb78nck.apps.
 const VB_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const VB_DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const VB_DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
-const VB_DRIVE_FOLDER_NAME = 'VB-Factory';
+// ─── Bac à sable ───
+// index.html?bac-a-sable=1 ouvre la même application sur un dossier Drive et un
+// cache local entièrement distincts. Permet d'essayer une nouveauté sur ses
+// vraies données — en y important une sauvegarde — sans qu'un seul octet du
+// dossier de production puisse bouger.
+const VB_BAC_A_SABLE = /[?&]bac-a-sable=1(&|$)/.test(location.search);
+if(VB_BAC_A_SABLE){
+  document.body.classList.add('vb-sandbox');
+  document.title = 'BAC À SABLE — ' + document.title;
+}
+const VB_SUFFIXE = VB_BAC_A_SABLE ? '_essai' : '';
+
+const VB_DRIVE_FOLDER_NAME = VB_BAC_A_SABLE ? 'VB-Factory-essai' : 'VB-Factory';
 const VB_DRIVE_BACKUPS_NAME = 'backups';
 const VB_DRIVE_DATA_NAME = 'vb-factory-data.json';
 const VB_DRIVE_RETENTION = 30;   // sauvegardes quotidiennes conservées
 const VB_DRIVE_DEBOUNCE_MS = 4000;   // laisse retomber une rafale de modifications
 const VB_DRIVE_MAX_WAIT_MS = 30000;  // mais on ne diffère jamais au-delà
-const VB_DRIVE_IDS_KEY = 'vb_drive_ids';
-const VB_DRIVE_DIRTY_KEY = 'vb_drive_dirty';
-const VB_DRIVE_BACKUP_DAY_KEY = 'vb_drive_backup_day';
-const VB_DRIVE_TOKEN_KEY = 'vb_drive_token';
+const VB_DRIVE_IDS_KEY = 'vb_drive_ids' + VB_SUFFIXE;
+const VB_DRIVE_DIRTY_KEY = 'vb_drive_dirty' + VB_SUFFIXE;
+const VB_DRIVE_BACKUP_DAY_KEY = 'vb_drive_backup_day' + VB_SUFFIXE;
+const VB_DRIVE_TOKEN_KEY = 'vb_drive_token' + VB_SUFFIXE;
 
 let vbCurrentUser = null;        // {user_id, username, role} — consommé par l'UI existante
 let vbDriveTokenClient = null;
@@ -8192,11 +8214,11 @@ function vbBuildDemoBookings(){
 // ── MODE DÉMO / PRODUCTION ──
 // 'demo' : données fictives, éphémères (jamais persistées), pour présentation.
 // 'production' : vraies données Vernet Behringer, persistées en localStorage, aucune donnée fictive.
-const VB_MODE_KEY = 'vb_factory_mode';
-const VB_PROD_PROJECTS_KEY = 'vb_factory_production_projects';
-const VB_PROD_PROJECTS_BACKUP_KEY = 'vb_factory_production_projects_backup'; // copie miroir de secours
-const VB_PROD_RESOURCES_KEY = 'vb_factory_production_resources';
-const VB_PROD_BOOKINGS_KEY = 'vb_factory_production_bookings';
+const VB_MODE_KEY = 'vb_factory_mode' + VB_SUFFIXE;
+const VB_PROD_PROJECTS_KEY = 'vb_factory_production_projects' + VB_SUFFIXE;
+const VB_PROD_PROJECTS_BACKUP_KEY = 'vb_factory_production_projects_backup' + VB_SUFFIXE; // copie miroir de secours
+const VB_PROD_RESOURCES_KEY = 'vb_factory_production_resources' + VB_SUFFIXE;
+const VB_PROD_BOOKINGS_KEY = 'vb_factory_production_bookings' + VB_SUFFIXE;
 
 function vbGetMode(){
   return localStorage.getItem(VB_MODE_KEY) === 'demo' ? 'demo' : 'production'; // défaut : production
