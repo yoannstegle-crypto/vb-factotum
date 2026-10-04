@@ -499,7 +499,12 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
 #vb-sandbox-bar{position:fixed;top:0;left:0;right:0;height:26px;z-index:10050;
   background:repeating-linear-gradient(45deg,#3C3489,#3C3489 12px,#4a4199 12px,#4a4199 24px);
   color:#fff;font-size:11px;font-weight:600;display:none;align-items:center;
-  justify-content:center;gap:8px;letter-spacing:0.02em}
+  justify-content:center;gap:8px;letter-spacing:0.02em;
+  /* une seule ligne, toujours : sur mobile le texte complet passait à deux
+     lignes et recouvrait le titre de la page, qui n'a que 26px de réservés. */
+  white-space:nowrap;overflow:hidden;padding:0 10px}
+#vb-sandbox-bar a{color:#fff;text-decoration:underline;flex:none}
+@media(max-width:768px){ .vb-sandbox-long{display:none} }
 body.vb-sandbox #vb-sandbox-bar{display:flex}
 body.vb-sandbox nav{top:26px;height:calc(100vh - 26px)}
 body.vb-sandbox main{padding-top:26px}
@@ -515,8 +520,7 @@ body.vb-sandbox #mobile-nav{bottom:0}
 </head>
 <body>
 <div id="vb-app-root">
-<div id="vb-sandbox-bar">BAC À SABLE — dossier Drive « VB-Factory-essai » · vos données de production ne sont pas touchées
-  <a href="./index.html" style="color:#fff;text-decoration:underline">Revenir à la production</a></div>
+<div id="vb-sandbox-bar"><b>BAC À SABLE</b><span class="vb-sandbox-long">— dossier Drive « VB-Factory-essai » · vos données de production ne sont pas touchées</span><a href="./index.html">Revenir à la production</a></div>
 <!-- ── BARRE NAV MOBILE BOTTOM ── -->
 <div id="mobile-nav">
   <button class="mob-nav-btn active" id="mob-nav-dashboard" onclick="showPage('dashboard');updateMobNav('dashboard')">
