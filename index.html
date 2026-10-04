@@ -644,7 +644,10 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
 <div class="page" id="page-projects">
   <div class="page-header">
     <div class="page-title">Projets</div>
-    <button class="btn btn-primary" onclick="showPage('new-project')">+ Nouveau projet</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn" onclick="vbFtOuvrirImport(null)">⬆ Importer une fiche technique</button>
+      <button class="btn btn-primary" onclick="showPage('new-project')">+ Nouveau projet</button>
+    </div>
   </div>
   <div class="search-bar">
     <input type="text" class="search-input" placeholder="Rechercher..." oninput="filterProjects(this.value)">
@@ -705,6 +708,7 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
       <button class="tab-btn" onclick="switchTab('tab-actual',this)">Dates réelles</button>
       <button class="tab-btn" onclick="switchTab('tab-compare',this)">Comparaison</button>
       <button class="tab-btn" onclick="switchTab('tab-reserves',this)">Réserves (OPL)</button>
+      <button class="tab-btn" onclick="switchTab('tab-ft',this)">Fiche technique</button>
     </div>
     <div class="tab-content active" id="tab-tasks"><div class="task-list" id="detail-tasks-planned"></div></div>
     <div class="tab-content" id="tab-actual"><div style="font-size:12px;color:var(--text2);margin-bottom:10px">Saisir les dates réelles.</div><div class="task-list" id="detail-tasks-actual"></div></div>
@@ -713,6 +717,7 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
       <div class="task-list" id="detail-tasks-compare"></div>
     </div>
     <div class="tab-content" id="tab-reserves"><div id="detail-reserves"></div></div>
+    <div class="tab-content" id="tab-ft"><div id="detail-ft"></div></div>
   </div>
 
   <!-- GANTT INLINE PROJET -->
@@ -2767,7 +2772,7 @@ function renderProjectDetail(id){
     ${p.type_machine?`<div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Type machine</span><span class="badge badge-${p.type_machine}" style="font-size:11px">${vbEsc(FL_TYPE_LABELS[p.type_machine]||p.type_machine)}</span></div>`:''}
     ${p.type_projet==='retrofit'?`<div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Projet</span><span style="background:var(--coral-50);color:var(--coral-800);padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">Retrofit</span></div>`:''}
   </div>`;
-  renderDetailKPIs(p);renderDetailTasks(p);vbRenderReservesTab(p);
+  renderDetailKPIs(p);renderDetailTasks(p);vbRenderReservesTab(p);vbFtRenderTab(p);
   // Init Gantt inline — centré sur la date de début du projet
   if(p.start_date)projGanttStart=new Date(p.start_date);
   else projGanttStart=new Date();
@@ -4807,13 +4812,17 @@ async function vbGeminiAppelBrut(modele, corps, cle){
   throw err;
 }
 
-async function vbGeminiCall({ prompt, schema, history }){
+async function vbGeminiCall({ prompt, schema, history, fichiers }){
   const cle = vbGeminiKey();
   if(!cle) throw new Error("Aucune clé Gemini enregistrée. Ouvrez Configuration pour l'ajouter.");
 
   const contents = [];
   (history || []).forEach(m => contents.push({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
-  contents.push({ role: 'user', parts: [{ text: prompt }] });
+  // Un PDF part tel quel : extraire son texte mélangerait libellés et valeurs
+  // (ces fiches sont des impressions d'Excel, les colonnes s'entrelacent).
+  const parts = (fichiers || []).map(f => ({ inline_data: { mime_type: f.mime, data: f.base64 } }));
+  parts.push({ text: prompt });
+  contents.push({ role: 'user', parts });
 
   const corps = { contents, generationConfig: { temperature: 0.2 } };
   if(schema){
@@ -5888,6 +5897,571 @@ async function vbFtExtraireMachine(XLSX, wb, machine) {
     rejetes: champs.filter(c => !c.fiable || !c.connu),
     a_definir_feuille: machine.aDefinir
   };
+}
+
+// ─── Onglet « Résumé » : commercial, échéancier et jalons ───
+// Les cellules y dérivent aussi d'un fichier à l'autre, même entre deux fiches du
+// même auteur : date de contrat en C5 (Dexis) contre B5 (Otavske). Même méthode.
+const VB_FT_RESUME_SCHEMA = {
+  type: 'object',
+  properties: {
+    num_affaire:    { type: 'string' },
+    incoterm:       { type: 'string' },
+    contrat_signe:  { type: 'string' },
+    date_passation: { type: 'string' },
+    delai:          { type: 'string' },
+    objet:          { type: 'string' },
+    echeancier: { type: 'array', items: { type: 'object', properties: {
+      libelle: { type:'string' }, pourcentage: { type:'string' }, date: { type:'string' }, cellule: { type:'string' }
+    }, required: ['libelle','cellule'] } },
+    jalons: { type: 'array', items: { type: 'object', properties: {
+      libelle: { type:'string' }, date: { type:'string' }, semaine: { type:'string' }, cellule: { type:'string' }
+    }, required: ['libelle','cellule'] } }
+  }
+};
+
+function vbFtPromptResume(lignes) {
+  return 'Tu lis l\'onglet « Résumé » d\'une fiche technique Vernet Behringer, rendu ligne par ligne,\n'
+    + 'chaque valeur précédée de sa référence de cellule entre crochets.\n\n'
+    + 'Règles impératives :\n'
+    + '- Ne retiens une valeur que si un libellé voisin la justifie. Ne déduis rien d\'une position.\n'
+    + '- « cellule » = la référence exacte d\'où vient la valeur.\n'
+    + '- Les dates au format AAAA-MM-JJ. Si une échéance est exprimée en numéro de semaine,\n'
+    + '  mets ce nombre dans « semaine » et laisse « date » vide. Ne la convertis PAS toi-même.\n'
+    + '- N\'invente aucune date. Un champ absent est simplement omis.\n\n'
+    + 'Cherche : le n° d\'affaire, l\'incoterm, la date de contrat signé, la date de passation,\n'
+    + 'le délai, l\'objet du projet, l\'échéancier de paiement (acompte, FAT, MES, SAT… avec\n'
+    + 'pourcentage et date si elle existe) et les jalons de planning.\n\n'
+    + 'Onglet Résumé :\n' + lignes.join('\n');
+}
+
+// Une date hors de cette fenêtre est une coquille, pas une donnée : l'une des
+// fiches porte une « date de fin » au 05/05/5818.
+function vbFtDateVraisemblable(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) return false;
+  const a = Number(String(iso).slice(0, 4));
+  return a >= 2015 && a <= 2045;
+}
+
+// Semaine N comptée depuis une origine : le fichier ne dit jamais laquelle, donc
+// on ne devine pas — l'origine est choisie à l'écran de confirmation.
+function vbFtDateDepuisSemaine(origineIso, n) {
+  const sem = Number(n);
+  if (!vbFtDateVraisemblable(origineIso) || !Number.isFinite(sem)) return null;
+  const d = new Date(origineIso + 'T12:00:00');
+  d.setDate(d.getDate() + sem * 7);
+  const iso = d.toISOString().slice(0, 10);
+  return typeof vbLundiSiWeekEnd === 'function' ? vbLundiSiWeekEnd(iso) : iso;
+}
+
+async function vbFtExtraireResume(XLSX, wb, analyse) {
+  if (!analyse.resume || !analyse.resume.length) return null;
+  const rep = await vbGeminiCall({ prompt: vbFtPromptResume(analyse.resume), schema: VB_FT_RESUME_SCHEMA });
+  const ws = wb.Sheets[analyse.resume_onglet];
+  const verif = (liste) => (liste || []).map(x => {
+    const brut = vbFtTexteCellule(ws[x.cellule]);
+    const douteuse = x.date && !vbFtDateVraisemblable(x.date);
+    return Object.assign({}, x, {
+      contenu_cellule: brut,
+      date: douteuse ? null : (x.date || null),
+      date_rejetee: douteuse ? x.date : null,
+      fiable: !!brut
+    });
+  });
+  return {
+    onglet: analyse.resume_onglet,
+    num_affaire: rep.num_affaire || null,
+    incoterm: rep.incoterm || null,
+    contrat_signe: vbFtDateVraisemblable(rep.contrat_signe) ? rep.contrat_signe : null,
+    date_passation: vbFtDateVraisemblable(rep.date_passation) ? rep.date_passation : null,
+    delai: rep.delai || null,
+    objet: rep.objet || null,
+    echeancier: verif(rep.echeancier),
+    jalons: verif(rep.jalons)
+  };
+}
+
+// ─── Fiche technique en PDF ───
+// Ces PDF sont des impressions d'Excel : l'extraction de texte entrelace les
+// colonnes et dissocie les libellés de leurs valeurs. Le fichier part donc
+// tel quel au modèle, qui lit la mise en page. En contrepartie il n'y a pas de
+// cellule à recontrôler : ces valeurs sont marquées comme non vérifiables.
+function vbFtFichierBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+    r.onerror = () => reject(new Error('Lecture du fichier impossible.'));
+    r.readAsDataURL(file);
+  });
+}
+
+async function vbFtExtrairePdf(file) {
+  const base64 = await vbFtFichierBase64(file);
+  const prompt = 'Tu lis une fiche technique Vernet Behringer au format PDF.\n\n'
+    + 'Règles : ne retiens une valeur que si son libellé la justifie dans la mise en page.\n'
+    + 'Si la valeur est « à définir » ou « ? », etat = "a_definir". N\'invente rien :\n'
+    + 'un champ absent est omis. Mets dans « cellule » le repère où tu l\'as lue\n'
+    + '(page et intitulé de section), et dans « libelle_source » le libellé exact.\n\n'
+    + 'Champs recherchés :\n' + VB_FT_CHAMPS.map(c => '- ' + c.cle + ' : ' + c.indice).join('\n');
+  const rep = await vbGeminiCall({ prompt, schema: VB_FT_SCHEMA,
+    fichiers: [{ mime: 'application/pdf', base64 }] });
+  const champs = (rep && rep.champs || []).map(c => {
+    const def = VB_FT_CHAMPS.find(d => d.cle === c.cle);
+    return {
+      cle: c.cle, libelle: def ? def.libelle : c.cle, valeur: c.valeur,
+      cellule: c.cellule || '', libelle_source: c.libelle_source || '',
+      etat: c.etat === 'a_definir' ? 'a_definir' : 'renseigne',
+      contenu_cellule: '', controle: 'pdf',
+      fiable: !!def, connu: !!def
+    };
+  });
+  // Un PDF n'a pas d'en-tête à position connue : on reconstitue celui-ci depuis
+  // les champs extraits, pour que la machine s'affiche et se nomme comme une autre.
+  const v = cle => (champs.find(c => c.cle === cle && c.etat === 'renseigne') || {}).valeur || null;
+  return {
+    onglet: file.name, source_pdf: true,
+    entete: { type_machine: v('type_machine'), modele: v('designation'),
+              client: v('client'), num_affaire: v('num_affaire') },
+    champs,
+    retenus: champs.filter(c => c.fiable && c.etat === 'renseigne'),
+    a_definir: champs.filter(c => c.etat === 'a_definir'),
+    rejetes: champs.filter(c => !c.connu),
+    a_definir_feuille: []
+  };
+}
+
+// ─── La fiche technique conservée dans le projet ───
+// Elle vit dans p.fiche_technique, part dans Drive comme le reste, reste
+// consultable après l'import, se modifie à la main et garde ses révisions.
+// Chaque champ sait d'où il vient : cellule d'origine, libellé qui l'a
+// justifié, et si la valeur a été reprise à la main depuis.
+
+function vbFtGet(p) { return (p && p.fiche_technique) || null; }
+
+function vbFtIndice(p) { const f = vbFtGet(p); return f ? (f.indice || 0) : 0; }
+
+// Archive l'état courant des champs avant toute modification, et incrémente
+// l'indice — même logique que snapshotAndIncrement pour le planning.
+function vbFtArchiver(p, commentaire) {
+  const f = vbFtGet(p);
+  if (!f) return;
+  f.historique = f.historique || [];
+  f.historique.push({
+    indice: f.indice || 0,
+    date: new Date().toISOString(),
+    auteur: (typeof vbCurrentUser !== 'undefined' && vbCurrentUser) ? vbCurrentUser.username : '',
+    commentaire: commentaire || '',
+    champs: JSON.parse(JSON.stringify(f.champs || []))
+  });
+  f.indice = (f.indice || 0) + 1;
+}
+
+function vbFtPoser(p, extraction, resume, source) {
+  const ancienne = vbFtGet(p);
+  if (ancienne) vbFtArchiver(p, 'Réimport depuis ' + (source || 'une fiche technique'));
+  const champs = (extraction.retenus || []).concat(extraction.a_definir || [])
+    .map(c => Object.assign({}, c, { origine: 'ft' }));
+  p.fiche_technique = {
+    source: source || '',
+    onglet: extraction.onglet || '',
+    source_pdf: !!extraction.source_pdf,
+    importe_le: new Date().toISOString(),
+    indice: ancienne ? ancienne.indice : 0,
+    entete: extraction.entete || {},
+    champs,
+    ecartes: extraction.rejetes || [],
+    a_definir_feuille: extraction.a_definir_feuille || [],
+    resume: resume || null,
+    historique: ancienne ? (ancienne.historique || []) : []
+  };
+  return p.fiche_technique;
+}
+
+// Modification manuelle d'un champ : archive, écrit, et marque l'origine pour
+// qu'un réimport ne l'efface pas sans qu'on le voie.
+function vbFtModifier(p, cle, valeur) {
+  const f = vbFtGet(p);
+  if (!f) return false;
+  const c = (f.champs || []).find(x => x.cle === cle);
+  const v = String(valeur == null ? '' : valeur).trim();
+  if (c && String(c.valeur || '') === v) return false;
+  vbFtArchiver(p, 'Modification manuelle : ' + ((c && c.libelle) || cle));
+  if (c) {
+    c.valeur = v;
+    c.origine = 'manuel';
+    c.etat = v ? 'renseigne' : 'a_definir';
+    c.controle = 'manuel';
+  } else {
+    const def = VB_FT_CHAMPS.find(d => d.cle === cle);
+    f.champs.push({ cle, libelle: def ? def.libelle : cle, valeur: v, cellule: '',
+      libelle_source: '', etat: v ? 'renseigne' : 'a_definir',
+      contenu_cellule: '', controle: 'manuel', fiable: true, connu: !!def, origine: 'manuel' });
+  }
+  return true;
+}
+
+const VB_FT_CONTROLE_LIB = {
+  exacte:     ['Vérifiée',       'var(--green-600,#16a34a)', 'la valeur correspond exactement au contenu de la cellule citée'],
+  extraite:   ['Vérifiée',       'var(--green-600,#16a34a)', 'la valeur a été extraite du contenu de la cellule citée'],
+  divergente: ['Non vérifiée',   'var(--red-600,#dc2626)',   'la cellule citée contient autre chose'],
+  absente:    ['Non vérifiée',   'var(--red-600,#dc2626)',   'la cellule citée est vide ou n’existe pas'],
+  pdf:        ['Non recoupée',   'var(--amber-700,#b45309)', 'lue dans un PDF : aucune cellule à recontrôler'],
+  manuel:     ['Saisie manuelle','var(--purple-600,#7c3aed)','valeur saisie à la main']
+};
+
+// ─── Affichage de la fiche technique dans le projet ───
+let vbFtRevisionVue = null;   // indice d'une révision consultée, null = version courante
+
+function vbFtBadgeControle(c) {
+  // Un champ « à définir » est fidèlement lu, mais ce n'est pas une valeur :
+  // le badger « Vérifiée » laissait croire que la donnée était acquise.
+  const d = c.etat === 'a_definir'
+    ? ['À définir', 'var(--amber-700,#b45309)', 'la fiche porte « à définir » à cet endroit : la valeur reste à obtenir']
+    : (VB_FT_CONTROLE_LIB[c.controle] || ['—', 'var(--text3)', '']);
+  return '<span title="' + vbEsc(d[2]) + '" style="font-size:10px;font-weight:600;color:' + d[1] + '">' + vbEsc(d[0]) + '</span>';
+}
+
+function vbFtOrigineTexte(c) {
+  if (c.origine === 'manuel') return 'saisie manuelle';
+  const bouts = [];
+  if (c.libelle_source) bouts.push('« ' + c.libelle_source + ' »');
+  if (c.cellule) bouts.push(c.controle === 'pdf' ? c.cellule : 'cellule ' + c.cellule);
+  return bouts.join(' · ') || '—';
+}
+
+function vbFtRenderTab(p) {
+  const el = document.getElementById('detail-ft');
+  if (!el) return;
+  const f = vbFtGet(p);
+  if (!f) {
+    el.innerHTML = '<div style="padding:28px;text-align:center;color:var(--text3);font-size:13px">'
+      + 'Aucune fiche technique importée pour cette affaire.<br><br>'
+      + '<button class="btn btn-primary" onclick="vbFtOuvrirImport(' + p.id + ')">⬆ Importer une fiche technique</button>'
+      + '</div>';
+    return;
+  }
+  const histo = f.historique || [];
+  const vue = vbFtRevisionVue !== null ? histo.find(h => h.indice === vbFtRevisionVue) : null;
+  const champs = vue ? vue.champs : (f.champs || []);
+  const lecture = !!vue;
+
+  const lignes = champs.map(c => {
+    const vide = !c.valeur || c.etat === 'a_definir';
+    return '<tr style="border-bottom:0.5px solid var(--border)">'
+      + '<td style="padding:7px 8px;color:var(--text2);font-size:12px;white-space:nowrap">' + vbEsc(c.libelle) + '</td>'
+      + '<td style="padding:5px 8px">'
+      + (lecture
+          ? '<span style="font-size:13px">' + vbEsc(c.valeur || '—') + '</span>'
+          : '<input class="form-input" style="font-size:13px;padding:4px 7px;width:100%'
+            + (vide ? ';background:var(--amber-50,#fffbeb)' : '') + '" value="' + vbEsc(c.valeur || '')
+            + '" onchange="vbFtSaisir(' + p.id + ',\'' + c.cle + '\',this.value)">')
+      + (vide ? '<div style="font-size:10px;color:var(--amber-700,#b45309);margin-top:2px">à définir dans la fiche</div>' : '')
+      + '</td>'
+      + '<td style="padding:7px 8px;font-size:11px;color:var(--text3)">' + vbEsc(vbFtOrigineTexte(c)) + '</td>'
+      + '<td style="padding:7px 8px;text-align:right">' + vbFtBadgeControle(c) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  const ecartes = (f.ecartes || []).filter(c => c.connu);
+  const blocEcartes = ecartes.length ? '<details style="margin-top:14px"><summary style="cursor:pointer;font-size:12px;color:var(--red-600,#dc2626);font-weight:600">'
+    + ecartes.length + ' valeur(s) proposée(s) mais non retenue(s)</summary>'
+    + '<div style="font-size:11px;color:var(--text2);margin:8px 0 6px">Le contrôle les a écartées : elles ne correspondent pas à la cellule citée. Rien n\'a été importé.</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+    + ecartes.map(c => '<tr style="border-bottom:0.5px solid var(--border)">'
+        + '<td style="padding:5px 8px;color:var(--text2)">' + vbEsc(c.libelle) + '</td>'
+        + '<td style="padding:5px 8px">proposé : « ' + vbEsc(c.valeur) + ' »</td>'
+        + '<td style="padding:5px 8px;color:var(--text3)">' + vbEsc(c.cellule) + ' contient : '
+        + (c.contenu_cellule ? '« ' + vbEsc(c.contenu_cellule) + ' »' : 'rien') + '</td></tr>').join('')
+    + '</table></details>' : '';
+
+  const r = f.resume;
+  const blocResume = !r ? '' : '<div style="margin-top:16px;border-top:0.5px solid var(--border);padding-top:14px">'
+    + '<div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">Onglet « ' + vbEsc(r.onglet || 'Résumé') + ' »</div>'
+    + (r.echeancier && r.echeancier.length ? '<div style="font-size:12px;margin-bottom:8px"><b>Échéancier :</b> '
+        + r.echeancier.map(e => vbEsc(e.libelle) + (e.pourcentage ? ' ' + vbEsc(e.pourcentage) : '') + (e.date ? ' au ' + e.date : '')).join(' · ') + '</div>' : '')
+    + (r.jalons && r.jalons.length ? '<div style="font-size:12px"><b>Jalons :</b> '
+        + r.jalons.map(j => vbEsc(j.libelle) + (j.date ? ' au ' + j.date : (j.semaine ? ' — semaine ' + vbEsc(j.semaine) : ''))).join(' · ') + '</div>' : '')
+    + '</div>';
+
+  const blocHisto = !histo.length ? '' : '<details style="margin-top:14px"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--text2)">'
+    + 'Révisions (' + histo.length + ')</summary><div style="margin-top:8px">'
+    + histo.slice().reverse().map(h => '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:0.5px solid var(--border);font-size:12px">'
+        + '<span class="indice-badge">Ind. ' + h.indice + '</span>'
+        + '<span style="flex:1;color:var(--text2)">' + vbEsc(h.commentaire || '—') + '</span>'
+        + '<span style="color:var(--text3);font-size:11px">' + new Date(h.date).toLocaleString('fr-FR') + '</span>'
+        + '<button class="btn btn-sm" onclick="vbFtVoirRevision(' + p.id + ',' + h.indice + ')">Voir</button>'
+        + '<button class="btn btn-sm" onclick="vbFtRestaurerRevision(' + p.id + ',' + h.indice + ')">Restaurer</button>'
+        + '</div>').join('') + '</div></details>';
+
+  el.innerHTML =
+    (lecture ? '<div style="background:var(--amber-50,#fffbeb);border:0.5px solid var(--amber-200,#fde68a);border-radius:6px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--amber-800,#92400e);display:flex;align-items:center;gap:10px">'
+        + '<span>Vous consultez la révision <b>Ind. ' + vue.indice + '</b> — lecture seule.</span>'
+        + '<button class="btn btn-sm" style="margin-left:auto" onclick="vbFtVoirRevision(' + p.id + ',null)">Revenir à la version courante</button></div>' : '')
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
+    + '<span class="indice-badge">Ind. ' + (f.indice || 0) + '</span>'
+    + '<span style="font-size:12px;color:var(--text2)">' + vbEsc(f.source || 'fiche importée')
+    + (f.onglet && !f.source_pdf ? ' · onglet « ' + vbEsc(f.onglet) + ' »' : '') + '</span>'
+    + '<span style="font-size:11px;color:var(--text3)">importée le ' + new Date(f.importe_le).toLocaleDateString('fr-FR') + '</span>'
+    + '<button class="btn btn-sm" style="margin-left:auto" onclick="vbFtOuvrirImport(' + p.id + ')">⬆ Réimporter</button>'
+    + '</div>'
+    + (f.a_definir_feuille && f.a_definir_feuille.length
+        ? '<div style="font-size:12px;color:var(--amber-800,#92400e);background:var(--amber-50,#fffbeb);border-radius:6px;padding:8px 11px;margin-bottom:12px">'
+          + f.a_definir_feuille.length + ' mention(s) « à définir » relevée(s) dans la fiche d\'origine.</div>' : '')
+    + '<table style="width:100%;border-collapse:collapse">'
+    + '<thead><tr style="border-bottom:0.5px solid var(--border2)">'
+    + '<th style="text-align:left;padding:5px 8px;font-size:10px;color:var(--text3);font-weight:600">CHAMP</th>'
+    + '<th style="text-align:left;padding:5px 8px;font-size:10px;color:var(--text3);font-weight:600">VALEUR</th>'
+    + '<th style="text-align:left;padding:5px 8px;font-size:10px;color:var(--text3);font-weight:600">PROVENANCE</th>'
+    + '<th style="text-align:right;padding:5px 8px;font-size:10px;color:var(--text3);font-weight:600">CONTRÔLE</th>'
+    + '</tr></thead><tbody>' + lignes + '</tbody></table>'
+    + blocResume + blocEcartes + blocHisto;
+}
+
+function vbFtSaisir(id, cle, valeur) {
+  const p = projects.find(x => x.id === id);
+  if (!p) return;
+  if (vbFtModifier(p, cle, valeur)) {
+    save();
+    vbFtRenderTab(p);
+    showNotification('✅ Fiche technique mise à jour — Ind. ' + vbFtIndice(p));
+  }
+}
+
+function vbFtVoirRevision(id, indice) {
+  vbFtRevisionVue = indice;
+  const p = projects.find(x => x.id === id);
+  if (p) vbFtRenderTab(p);
+}
+
+function vbFtRestaurerRevision(id, indice) {
+  const p = projects.find(x => x.id === id);
+  const f = vbFtGet(p);
+  if (!f) return;
+  const h = (f.historique || []).find(x => x.indice === indice);
+  if (!h) return;
+  if (!confirm('Restaurer la fiche technique dans son état Ind. ' + indice + ' ?\n\nL\'état actuel sera archivé comme révision, rien n\'est perdu.')) return;
+  vbFtArchiver(p, 'Avant restauration de l\'Ind. ' + indice);
+  f.champs = JSON.parse(JSON.stringify(h.champs || []));
+  vbFtRevisionVue = null;
+  save();
+  vbFtRenderTab(p);
+  showNotification('✅ Révision Ind. ' + indice + ' restaurée — nouvel Ind. ' + vbFtIndice(p));
+}
+
+// ─── Import d'une fiche technique : analyse, confirmation, écriture ───
+// Rien n'entre dans un projet avant validation à l'écran, et un même fichier
+// peut alimenter plusieurs affaires (la trame commerciale décrit 3 machines).
+let vbFtImport = null;   // état de l'import en cours
+
+function vbFtOuvrirImport(projetId) {
+  vbFtImport = { projetId: projetId || null, machines: [], resume: null, source: '' };
+  openModal('Importer une fiche technique',
+    '<div style="font-size:13px;color:var(--text2);margin-bottom:12px">'
+    + 'Fichier Excel (.xlsx) ou PDF. Les machines sont détectées automatiquement — '
+    + 'un fichier peut décrire plusieurs affaires.</div>'
+    + '<input type="file" id="vb-ft-fichier" accept=".xlsx,.xlsm,.xls,.pdf" class="form-input" style="margin-bottom:10px">'
+    + '<div id="vb-ft-etat" style="font-size:12px;min-height:22px;color:var(--text2)"></div>',
+    [ { label: 'Analyser', primary: true, action: vbFtLancerAnalyse },
+      { label: 'Annuler', action: closeModal } ]);
+}
+
+function vbFtEtat(txt, couleur) {
+  const el = document.getElementById('vb-ft-etat');
+  if (el) { el.innerHTML = txt; el.style.color = couleur || 'var(--text2)'; }
+}
+
+async function vbFtLancerAnalyse() {
+  const file = document.getElementById('vb-ft-fichier')?.files?.[0];
+  if (!file) { vbFtEtat('⚠ Sélectionnez un fichier.', 'var(--amber-700,#b45309)'); return; }
+  vbFtImport.source = file.name;
+  try {
+    if (/\.pdf$/i.test(file.name)) {
+      vbFtEtat('⏳ Lecture du PDF par l’assistant…');
+      vbFtImport.machines = [await vbFtExtrairePdf(file)];
+      return vbFtEcranConfirmation();
+    }
+    vbFtEtat('⏳ Ouverture du classeur…');
+    const XLSX = await loadXLSX();
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+    const analyse = vbFtAnalyserClasseur(XLSX, wb);
+    if (!analyse.machines.length) {
+      vbFtEtat('✗ Aucun onglet de fiche technique reconnu dans ce fichier.', 'var(--red-600,#dc2626)');
+      return;
+    }
+    const extraites = [];
+    for (let i = 0; i < analyse.machines.length; i++) {
+      const m = analyse.machines[i];
+      vbFtEtat('⏳ Lecture de « ' + vbEsc(m.onglet.trim()) + ' » ('
+        + (i + 1) + '/' + analyse.machines.length + ')…');
+      extraites.push(await vbFtExtraireMachine(XLSX, wb, m));
+    }
+    if (analyse.resume) {
+      vbFtEtat('⏳ Lecture de l’onglet « ' + vbEsc(analyse.resume_onglet) + ' »…');
+      try { vbFtImport.resume = await vbFtExtraireResume(XLSX, wb, analyse); }
+      catch (e) { console.warn('Résumé illisible', e); }
+    }
+    vbFtImport.machines = extraites;
+    vbFtImport.suivi_onglet = analyse.suivi_onglet;
+    vbFtEcranConfirmation();
+  } catch (e) {
+    vbFtEtat('✗ ' + vbEsc(e.message), 'var(--red-600,#dc2626)');
+  }
+}
+
+function vbFtOptionsProjets(sel) {
+  return '<option value="">— Créer une nouvelle affaire —</option>'
+    + projects.map(p => '<option value="' + p.id + '"' + (String(sel) === String(p.id) ? ' selected' : '') + '>'
+        + vbEsc(p.name) + '</option>').join('');
+}
+
+function vbFtEcranConfirmation() {
+  const r = vbFtImport.resume;
+  const semaines = r ? (r.jalons || []).filter(j => j.semaine && !j.date) : [];
+  const origines = [];
+  if (r && r.contrat_signe)  origines.push(['contrat', r.contrat_signe,  'contrat signé le ' + r.contrat_signe]);
+  if (r && r.date_passation) origines.push(['passation', r.date_passation, 'passation du ' + r.date_passation]);
+
+  const cartes = vbFtImport.machines.map((m, i) => {
+    const e = m.entete || {};
+    const titre = [e.type_machine, e.modele].filter(Boolean).join(' — ') || m.onglet;
+    const preselection = vbFtImport.projetId || '';
+    return '<div style="border:0.5px solid var(--border2);border-radius:8px;padding:14px;margin-bottom:12px">'
+      + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">'
+      + '<label style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;cursor:pointer">'
+      + '<input type="checkbox" id="vb-ft-ok-' + i + '" checked> ' + vbEsc(titre) + '</label>'
+      + '<span style="font-size:11px;color:var(--text3)">'
+      + (m.source_pdf
+          ? (titre === m.onglet ? 'PDF' : 'PDF · ' + vbEsc(m.onglet))
+          : 'onglet « ' + vbEsc(m.onglet.trim()) + ' »')
+      + '</span>'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px">'
+      + '<span style="color:var(--text2)">Destination :</span>'
+      + '<select id="vb-ft-dest-' + i + '" class="form-input" style="font-size:12px;padding:4px 7px;flex:1">'
+      + vbFtOptionsProjets(preselection) + '</select></div>'
+      + '<div style="font-size:12px;color:var(--text2);margin-bottom:6px">'
+      + '<b>' + m.retenus.length + '</b> champ(s) vérifié(s)'
+      + (m.a_definir.length ? ' · <b>' + m.a_definir.length + '</b> à définir' : '')
+      + (m.rejetes.filter(c => c.connu).length ? ' · <span style="color:var(--red-600,#dc2626)"><b>'
+          + m.rejetes.filter(c => c.connu).length + '</b> écarté(s) par le contrôle</span>' : '')
+      + '</div>'
+      + '<div style="max-height:190px;overflow:auto;border:0.5px solid var(--border);border-radius:6px">'
+      + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+      + m.retenus.concat(m.a_definir).map(c => '<tr style="border-bottom:0.5px solid var(--border)">'
+          + '<td style="padding:4px 8px;color:var(--text2);white-space:nowrap">' + vbEsc(c.libelle) + '</td>'
+          + '<td style="padding:4px 8px">' + vbEsc(c.valeur || '—') + '</td>'
+          + '<td style="padding:4px 8px;color:var(--text3);font-size:10px;white-space:nowrap">' + vbEsc(c.cellule) + '</td>'
+          + '<td style="padding:4px 8px;text-align:right">' + vbFtBadgeControle(c) + '</td></tr>').join('')
+      + '</table></div>'
+      + (m.rejetes.filter(x => x.connu).length
+          ? '<details style="margin-top:8px"><summary style="cursor:pointer;font-size:11px;font-weight:600;color:var(--red-600,#dc2626)">'
+            + 'Voir les valeurs écartées par le contrôle</summary>'
+            + '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:6px">'
+            + m.rejetes.filter(x => x.connu).map(x => '<tr style="border-bottom:0.5px solid var(--border)">'
+                + '<td style="padding:4px 8px;color:var(--text2)">' + vbEsc(x.libelle) + '</td>'
+                + '<td style="padding:4px 8px">proposé : « ' + vbEsc(x.valeur) + ' »</td>'
+                + '<td style="padding:4px 8px;color:var(--text3)">' + vbEsc(x.cellule) + ' contient '
+                + (x.contenu_cellule ? '« ' + vbEsc(x.contenu_cellule) + ' »' : 'rien') + '</td></tr>').join('')
+            + '</table></details>'
+          : '')
+      + '</div>';
+  }).join('');
+
+  const blocSemaines = !semaines.length ? '' :
+    '<div style="border:0.5px solid var(--amber-200,#fde68a);background:var(--amber-50,#fffbeb);border-radius:8px;padding:12px;margin-bottom:12px">'
+    + '<div style="font-size:12px;font-weight:600;color:var(--amber-800,#92400e);margin-bottom:6px">Jalons exprimés en numéro de semaine</div>'
+    + '<div style="font-size:12px;color:var(--amber-800,#92400e);margin-bottom:8px">'
+    + 'Le fichier ne dit pas depuis quelle date ces semaines sont comptées. Choisissez l’origine — '
+    + 'rien ne sera converti sans elle.</div>'
+    + '<select id="vb-ft-origine" class="form-input" style="font-size:12px;padding:4px 7px;margin-bottom:8px" onchange="vbFtRecalculerSemaines()">'
+    + '<option value="">— ne pas convertir —</option>'
+    + origines.map(o => '<option value="' + o[1] + '">Depuis le ' + o[2] + '</option>').join('')
+    + '</select>'
+    + '<div id="vb-ft-apercu-semaines" style="font-size:12px;color:var(--amber-800,#92400e)">'
+    + semaines.map(j => vbEsc(j.libelle) + ' — semaine ' + vbEsc(j.semaine)).join(' · ') + '</div></div>';
+
+  const blocSuivi = !vbFtImport.suivi_onglet ? '' :
+    '<div style="font-size:12px;color:var(--text2);background:var(--bg2,#faf9f6);border-radius:6px;padding:10px;margin-bottom:12px">'
+    + 'L’onglet « ' + vbEsc(vbFtImport.suivi_onglet) + ' » (suivi interne) n’est pas importé : '
+    + 'il contient souvent les notes d’un projet antérieur quand le fichier a été enregistré-sous. '
+    + 'Il reste à traiter séparément.</div>';
+
+  openModal('Fiche technique — ' + vbFtImport.machines.length + ' machine(s) détectée(s)',
+    blocSemaines + blocSuivi + cartes
+    + '<div style="font-size:11px;color:var(--text3);margin-top:4px">Rien n’est écrit avant votre validation.</div>',
+    [ { label: 'Appliquer', primary: true, action: vbFtAppliquerImport },
+      { label: 'Annuler', action: closeModal } ]);
+}
+
+function vbFtRecalculerSemaines() {
+  const origine = document.getElementById('vb-ft-origine')?.value || '';
+  const r = vbFtImport.resume;
+  const el = document.getElementById('vb-ft-apercu-semaines');
+  if (!r || !el) return;
+  el.innerHTML = (r.jalons || []).filter(j => j.semaine && !j.date).map(j => {
+    const d = origine ? vbFtDateDepuisSemaine(origine, j.semaine) : null;
+    return vbEsc(j.libelle) + ' — semaine ' + vbEsc(j.semaine) + (d ? ' → <b>' + d + '</b>' : '');
+  }).join(' · ');
+}
+
+function vbFtAppliquerImport() {
+  const origine = document.getElementById('vb-ft-origine')?.value || '';
+  const r = vbFtImport.resume;
+  if (r && origine) {
+    (r.jalons || []).forEach(j => {
+      if (j.semaine && !j.date) {
+        j.date = vbFtDateDepuisSemaine(origine, j.semaine);
+        j.origine_semaine = origine;
+      }
+    });
+  }
+  let crees = 0, completes = 0;
+  vbFtImport.machines.forEach((m, i) => {
+    if (!document.getElementById('vb-ft-ok-' + i)?.checked) return;
+    const dest = document.getElementById('vb-ft-dest-' + i)?.value || '';
+    let p = dest ? projects.find(x => String(x.id) === String(dest)) : null;
+    if (p) { completes++; }
+    else {
+      p = vbFtCreerProjet(m);
+      projects.push(p);
+      crees++;
+    }
+    vbFtPoser(p, m, r, vbFtImport.source);
+    vbFtAppliquerAuProjet(p, m, r);
+  });
+  save();
+  closeModal();
+  showNotification('✅ Fiche technique appliquée — ' + crees + ' affaire(s) créée(s), ' + completes + ' complétée(s)', 4000);
+  if (typeof showPage === 'function') showPage('projects');
+}
+
+function vbFtCreerProjet(m) {
+  const e = m.entete || {};
+  const champ = cle => (m.retenus.find(c => c.cle === cle) || {}).valeur || null;
+  const nom = [champ('client') || e.client, champ('type_machine') || e.type_machine, champ('designation') || e.modele]
+    .filter(Boolean).join(' - ') || ('Affaire importée — ' + (m.onglet || '').trim());
+  const maxId = projects.length ? Math.max(...projects.map(x => x.id)) : 0;
+  return {
+    id: maxId + 1, name: nom, status: 'etude',
+    tasks: [], journal: [], reserves: [], history: [], indice: 0,
+    fiche_liaison: null, type_projet: 'standard', type_machine: null,
+    chef_bem: '', chef_bea: '',
+    start_date: null, end_date: null
+  };
+}
+
+// Les champs du projet reprennent la fiche, sans jamais écraser une valeur
+// déjà saisie à la main : la fiche complète, elle ne remplace pas.
+function vbFtAppliquerAuProjet(p, m, r) {
+  const champ = cle => (m.retenus.find(c => c.cle === cle) || {}).valeur || null;
+  const poser = (prop, val) => { if (val && !p[prop]) p[prop] = val; };
+  poser('ingenieur_commercial', champ('ingenieur_com'));
+  poser('charge_affaires', champ('charge_affaires'));
+  poser('contact_tech', champ('contact_tech'));
+  poser('incoterm', champ('incoterm') || (r && r.incoterm));
+  poser('ref', champ('num_affaire') || (r && r.num_affaire) || (m.entete && m.entete.num_affaire));
+  poser('city', champ('ville'));
+  poser('country', champ('pays'));
 }
 
 const FT_CELL_MAP = {
