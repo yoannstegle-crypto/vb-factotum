@@ -486,6 +486,18 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
   box-shadow:0 1px 3px rgba(0,0,0,0.3);transition:left 0.15s}
 .vb-mode-help{border:none;background:none;cursor:help;color:var(--text3,#8a8a85);
   font-size:11px;padding:0 2px;line-height:1}
+.vb-bac-ligne{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:6px}
+.vb-bac-btn{display:block;text-align:center;margin-top:6px;padding:5px 10px;border-radius:14px;
+  border:0.5px dashed var(--purple-200,#c4b5fd);background:var(--purple-50,#faf5ff);
+  color:var(--purple-800,#6b21a8);font-size:11px;font-weight:600;text-decoration:none;
+  white-space:nowrap;transition:background 0.15s}
+.vb-bac-ligne .vb-bac-btn{margin-top:0}
+.vb-bac-btn:hover{background:var(--purple-100,#f3e8ff)}
+.vb-bac-retour{border-style:solid;border-color:#3C3489;background:#3C3489;color:#fff}
+.vb-bac-retour:hover{background:#4a4199}
+.vb-bac-aide{cursor:help;font-size:10px;font-weight:700;color:var(--purple-600,#7c3aed);
+  border:1px solid currentColor;border-radius:50%;width:15px;height:15px;flex:none;
+  display:flex;align-items:center;justify-content:center;line-height:1}
 #vb-mode-tip{position:fixed;z-index:10002;max-width:270px;background:#2c2c2a;color:#f5f5f0;
   padding:9px 11px;border-radius:7px;font-size:11px;font-weight:400;line-height:1.5;
   box-shadow:0 4px 16px rgba(0,0,0,0.28);pointer-events:none;display:none}
@@ -1016,13 +1028,6 @@ body.vb-sandbox #mobile-nav{bottom:0}
       <div id="vb-backup-list" style="background:#fff;border:1px solid #e9d5ff;border-radius:8px;overflow:hidden">
         <div style="padding:14px;font-size:12px;color:#7c3aed">Ouvrez cette page en étant connecté pour voir vos sauvegardes.</div>
       </div>
-      <div id="vb-lien-bac-a-sable" style="margin-top:12px;padding:10px 12px;background:#fff;border:0.5px dashed #c4b5fd;border-radius:6px;font-size:12px;color:#6b21a8">
-        <b>Essayer sans risque</b> — le bac à sable ouvre la même application sur un dossier Drive
-        <b>VB-Factory-essai</b> distinct. Importez-y une sauvegarde pour travailler sur vos vraies
-        affaires : le dossier de production ne peut pas bouger.
-        <a href="./index.html?bac-a-sable=1" target="_blank" rel="noopener"
-           style="display:inline-block;margin-top:6px;color:#7c3aed;font-weight:600">Ouvrir un bac à sable →</a>
-      </div>
       <div style="font-size:11px;color:#7c3aed;margin-top:10px;line-height:1.5">
         ℹ️ Restaurer remplace entièrement les données actuelles par celles de la sauvegarde.
         Google Drive conserve en plus son propre historique de versions du fichier
@@ -1127,11 +1132,6 @@ const VB_BAC_A_SABLE = /[?&]bac-a-sable=1(&|$)/.test(location.search);
 if(VB_BAC_A_SABLE){
   document.body.classList.add('vb-sandbox');
   document.title = 'BAC À SABLE — ' + document.title;
-  // L'invitation à ouvrir un bac à sable n'a pas de sens quand on y est déjà.
-  document.addEventListener('DOMContentLoaded', () => {
-    const el = document.getElementById('vb-lien-bac-a-sable');
-    if(el) el.style.display = 'none';
-  });
 }
 const VB_SUFFIXE = VB_BAC_A_SABLE ? '_essai' : '';
 
@@ -8373,7 +8373,13 @@ const VB_MODE_AIDE = {
       + 'Chaque modification part dans Google Drive en quelques secondes.<br><br>'
       + 'Filets de sécurité : une sauvegarde automatique par jour (30 conservées), '
       + 'un point de restauration créé avant chaque import ou remise à zéro, '
-      + 'et l\'historique de versions de Google Drive.'
+      + 'et l\'historique de versions de Google Drive.',
+  bac: '<b>Bac à sable</b><br>La même application, sur un dossier Drive '
+      + '<b>VB-Factory-essai</b> séparé.<br><br>'
+      + 'Tout y est distinct : affaires, ressources, sauvegardes, réglages. Importez-y '
+      + 'une sauvegarde pour essayer sur vos vraies données — le dossier de production '
+      + 'ne peut pas bouger.<br><br>'
+      + 'S\'ouvre dans un nouvel onglet : les deux peuvent rester ouverts en même temps.'
 };
 
 function vbModeTipEl(){
@@ -8417,7 +8423,9 @@ function vbModeTipToggle(ancre, cle){
   t.dataset.epingle = '1';
 }
 document.addEventListener('click', e => {
-  if(!e.target.closest || !e.target.closest('.vb-mode-label')) vbModeTipHide();
+  // Le « ? » du bac à sable ouvre la même info-bulle : sans lui dans ce test,
+  // le clic qui vient de l'ouvrir la refermait aussitôt.
+  if(!e.target.closest || !e.target.closest('.vb-mode-label, .vb-bac-aide')) vbModeTipHide();
 });
 
 function vbModePillHtml(isDemo){
@@ -8435,9 +8443,23 @@ function vbModePillHtml(isDemo){
     + '</div>';
 }
 
+// L'accès au bac à sable vit sous le sélecteur de mode, pas enterré dans la page
+// Export : c'est le même geste — choisir dans quel monde on travaille.
+function vbModeBacHtml(){
+  const att = 'onmouseenter="vbModeTipShow(this,\'bac\')" onmouseleave="vbModeTipHideSurvol()" '
+            + 'onfocus="vbModeTipShow(this,\'bac\')" onblur="vbModeTipHideSurvol()" '
+            + 'onclick="vbModeTipToggle(this,\'bac\')" tabindex="0" role="button"';
+  if(VB_BAC_A_SABLE){
+    return '<a class="vb-bac-btn vb-bac-retour" href="./index.html">↩ Revenir à la production</a>';
+  }
+  return '<div class="vb-bac-ligne">'
+    + '<a class="vb-bac-btn" href="./index.html?bac-a-sable=1" target="_blank" rel="noopener">🧪 Bac à sable</a>'
+    + '<span class="vb-bac-aide" ' + att + '>?</span></div>';
+}
+
 function vbRenderModeBadge(){
   const isDemo = vbGetMode() === 'demo';
-  const html = vbModePillHtml(isDemo);
+  const html = vbModePillHtml(isDemo) + vbModeBacHtml();
   // Deux emplacements, un seul visible à la fois (CSS) : barre latérale et onglet « Plus ».
   ['vb-mode-slot', 'vb-mode-slot-mobile'].forEach(id => {
     const el = document.getElementById(id);
