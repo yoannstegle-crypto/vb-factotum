@@ -305,6 +305,7 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
   /* Masquer la nav latérale sur mobile */
   nav{display:none!important}
 
+
   /* Barre de navigation bottom fixe */
   #mobile-nav{
     display:flex!important;
@@ -465,6 +466,61 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
 }
 
 /* Masquer la nav bottom sur desktop */
+/* ── SÉLECTEUR DE MODE (Démo / Production) ── */
+/* Il vivait en position:fixed en bas à gauche, où il recouvrait la barre de navigation
+   mobile. Il est désormais posé dans le flux : barre latérale sur écran large, onglet
+   « Plus » sur mobile. Le mode actif est signalé par la couleur, ce qui a permis de
+   supprimer la bannière jaune qui masquait le haut de la page. */
+.vb-mode-slot{padding:10px 8px 4px}
+.vb-mode-slot-mobile{display:none}
+.vb-mode-pill{display:flex;align-items:center;justify-content:center;gap:7px;
+  background:var(--bg2,#fff);border:0.5px solid var(--border,#ddd);
+  border-radius:24px;padding:5px 8px;font-size:11px;font-weight:600}
+.vb-mode-label{padding:3px 8px;border-radius:12px;cursor:help;color:var(--text3,#8a8a85);
+  transition:background 0.15s,color 0.15s;white-space:nowrap}
+.vb-mode-label.on-demo{background:#fde68a;color:#92400e;box-shadow:0 0 0 1px #d97706 inset}
+.vb-mode-label.on-prod{background:#dcfce7;color:#166534;box-shadow:0 0 0 1px #16a34a inset}
+.vb-mode-switch{position:relative;width:38px;height:20px;border-radius:12px;border:none;
+  cursor:pointer;padding:0;flex:none;transition:background 0.15s}
+.vb-mode-knob{position:absolute;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,0.3);transition:left 0.15s}
+.vb-mode-help{border:none;background:none;cursor:help;color:var(--text3,#8a8a85);
+  font-size:11px;padding:0 2px;line-height:1}
+.vb-bac-ligne{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:6px}
+.vb-bac-btn{display:block;text-align:center;margin-top:6px;padding:5px 10px;border-radius:14px;
+  border:0.5px dashed var(--purple-200,#c4b5fd);background:var(--purple-50,#faf5ff);
+  color:var(--purple-800,#6b21a8);font-size:11px;font-weight:600;text-decoration:none;
+  white-space:nowrap;transition:background 0.15s}
+.vb-bac-ligne .vb-bac-btn{margin-top:0}
+.vb-bac-btn:hover{background:var(--purple-100,#f3e8ff)}
+.vb-bac-retour{border-style:solid;border-color:#3C3489;background:#3C3489;color:#fff}
+.vb-bac-retour:hover{background:#4a4199}
+.vb-bac-aide{cursor:help;font-size:10px;font-weight:700;color:var(--purple-600,#7c3aed);
+  border:1px solid currentColor;border-radius:50%;width:15px;height:15px;flex:none;
+  display:flex;align-items:center;justify-content:center;line-height:1}
+#vb-mode-tip{position:fixed;z-index:10002;max-width:270px;background:#2c2c2a;color:#f5f5f0;
+  padding:9px 11px;border-radius:7px;font-size:11px;font-weight:400;line-height:1.5;
+  box-shadow:0 4px 16px rgba(0,0,0,0.28);pointer-events:none;display:none}
+#vb-mode-tip b{color:#fff}
+/* Déclaré APRÈS la règle de base : sur mobile la barre latérale est masquée,
+   le sélecteur se replie dans l'onglet « Plus ». */
+@media(max-width:768px){
+  .vb-mode-slot-mobile{display:block;margin-bottom:14px}
+}
+/* ── BANDEAU BAC À SABLE ── */
+#vb-sandbox-bar{position:fixed;top:0;left:0;right:0;height:26px;z-index:10050;
+  background:repeating-linear-gradient(45deg,#3C3489,#3C3489 12px,#4a4199 12px,#4a4199 24px);
+  color:#fff;font-size:11px;font-weight:600;display:none;align-items:center;
+  justify-content:center;gap:8px;letter-spacing:0.02em;
+  /* une seule ligne, toujours : sur mobile le texte complet passait à deux
+     lignes et recouvrait le titre de la page, qui n'a que 26px de réservés. */
+  white-space:nowrap;overflow:hidden;padding:0 10px}
+#vb-sandbox-bar a{color:#fff;text-decoration:underline;flex:none}
+@media(max-width:768px){ .vb-sandbox-long{display:none} }
+body.vb-sandbox #vb-sandbox-bar{display:flex}
+body.vb-sandbox nav{top:26px;height:calc(100vh - 26px)}
+body.vb-sandbox main{padding-top:26px}
+body.vb-sandbox #mobile-nav{bottom:0}
 #mobile-nav,#mobile-save-btn{display:none}
 @media print{
   nav{display:none}
@@ -476,11 +532,7 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
 </head>
 <body>
 <div id="vb-app-root">
-<!-- ═══ BANNIÈRE DÉMO ═══ -->
-<div id="vb-demo-banner" style="position:fixed;top:0;left:0;right:0;background:linear-gradient(90deg,#fef3c7,#fde68a);border-bottom:2px solid #d97706;padding:10px 24px;z-index:9999;font-size:12px;font-weight:600;color:#92400e;display:none;align-items:center;justify-content:space-between">
-  <div>🎬 <strong>MODE DÉMO</strong> — 14 projets • 20 techniciens • 2 CA • Cliquez 🔄 pour basculer Manager ↔ CA</div>
-  <button onclick="this.parentElement.style.display='none'" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;color:inherit">✕</button>
-</div>
+<div id="vb-sandbox-bar"><b>BAC À SABLE</b><span class="vb-sandbox-long">— dossier Drive « VB-Factory-essai » · vos données de production ne sont pas touchées</span><a href="./index.html">Revenir à la production</a></div>
 <!-- ── BARRE NAV MOBILE BOTTOM ── -->
 <div id="mobile-nav">
   <button class="mob-nav-btn active" id="mob-nav-dashboard" onclick="showPage('dashboard');updateMobNav('dashboard')">
@@ -513,6 +565,7 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
     <button class="nav-btn active" onclick="showPage('dashboard')" id="nav-dashboard"><span class="nav-icon">📊</span><span>Tableau de bord</span></button>
     <button class="nav-btn" onclick="showPage('timeline')" id="nav-timeline"><span class="nav-icon">📅</span><span>Timeline</span></button>
     <button class="nav-btn" onclick="showPage('projects')" id="nav-projects"><span class="nav-icon">📁</span><span>Projets</span></button>
+    <button class="nav-btn" onclick="vbAssistantOpen()" id="nav-assistant"><span class="nav-icon">🤖</span><span>Assistant</span></button>
     <div class="nav-section">Gestion</div>
     <button class="nav-btn" onclick="showPage('new-project')" id="nav-new-project"><span class="nav-icon">➕</span><span>Nouveau projet</span></button>
     <button class="nav-btn" onclick="showPage('config')" id="nav-config"><span class="nav-icon">⚙️</span><span>Configuration</span></button>
@@ -522,6 +575,7 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
       <span class="nav-icon">💾</span><span>Sauvegarder</span>
     </button>
     <div id="last-save-info" style="font-size:11px;color:var(--text3);padding:6px 10px;text-align:center;border-top:0.5px solid var(--border);margin-top:6px">💾 Dernière : jamais</div>
+    <div id="vb-mode-slot" class="vb-mode-slot"></div>
   </div>
   <div class="nav-footer">VB-Factory</div>
 </nav>
@@ -617,7 +671,10 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
 <div class="page" id="page-projects">
   <div class="page-header">
     <div class="page-title">Projets</div>
-    <button class="btn btn-primary" onclick="showPage('new-project')">+ Nouveau projet</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn" onclick="vbFtOuvrirImport(null)">⬆ Importer une fiche technique</button>
+      <button class="btn btn-primary" onclick="showPage('new-project')">+ Nouveau projet</button>
+    </div>
   </div>
   <div class="search-bar">
     <input type="text" class="search-input" placeholder="Rechercher..." oninput="filterProjects(this.value)">
@@ -678,6 +735,7 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
       <button class="tab-btn" onclick="switchTab('tab-actual',this)">Dates réelles</button>
       <button class="tab-btn" onclick="switchTab('tab-compare',this)">Comparaison</button>
       <button class="tab-btn" onclick="switchTab('tab-reserves',this)">Réserves (OPL)</button>
+      <button class="tab-btn" onclick="switchTab('tab-ft',this)">Fiche technique</button>
     </div>
     <div class="tab-content active" id="tab-tasks"><div class="task-list" id="detail-tasks-planned"></div></div>
     <div class="tab-content" id="tab-actual"><div style="font-size:12px;color:var(--text2);margin-bottom:10px">Saisir les dates réelles.</div><div class="task-list" id="detail-tasks-actual"></div></div>
@@ -686,6 +744,7 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
       <div class="task-list" id="detail-tasks-compare"></div>
     </div>
     <div class="tab-content" id="tab-reserves"><div id="detail-reserves"></div></div>
+    <div class="tab-content" id="tab-ft"><div id="detail-ft"></div></div>
   </div>
 
   <!-- GANTT INLINE PROJET -->
@@ -885,6 +944,37 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
       </div>
     </div>
     <div class="config-section">
+      <div class="config-section-title">🤖 Assistant IA</div>
+      <div style="font-size:12px;color:var(--text2,#666);margin-bottom:10px;line-height:1.55">
+        L'assistant répond à partir de vos données réelles — retards, jalons, paiements, réserves — calculées par l'application.
+        La clé reste <b>sur cet appareil</b> et n'est jamais enregistrée dans votre Drive : il faut donc la saisir sur chaque appareil.
+        Elle se crée gratuitement sur <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>.
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Clé API Gemini</label>
+          <input type="password" class="form-input" id="cfg-gemini-key" placeholder="AIza…" autocomplete="off"></div>
+        <div class="form-group"><label class="form-label">Modèle</label>
+          <input type="text" class="form-input" id="cfg-gemini-model" autocomplete="off">
+          <div style="font-size:11px;color:var(--text3,#999);margin-top:3px">Laisser vide pour le modèle par défaut. Google en retire régulièrement : si l'assistant signale qu'un modèle n'est plus disponible, il vous proposera le remplaçant.</div>
+        </div>
+        <div class="form-group"><label class="form-label">Modèle de repli</label>
+          <input type="text" class="form-input" id="cfg-gemini-repli" autocomplete="off">
+          <div style="font-size:11px;color:var(--text3,#999);margin-top:3px">Essayé automatiquement si le modèle principal reste saturé. Un modèle plus léger est moins sollicité aux heures de pointe.</div>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <div style="font-size:12px;font-weight:600;margin-bottom:4px">🧠 Ce que l'assistant a retenu</div>
+        <div id="cfg-memoire-list"></div>
+      </div>
+      <div style="margin-top:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <div style="font-size:12px;font-weight:600">💡 Idées d'évolution</div>
+          <button class="btn btn-sm" style="margin-left:auto" onclick="vbCopyIdees()">Copier la liste</button>
+        </div>
+        <div id="cfg-idees-list"></div>
+      </div>
+    </div>
+    <div class="config-section">
       <div class="config-section-title">🎯 Paramètres KPI</div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Écart cible (jours)</label><input type="number" class="form-input" id="cfg-target-gap" min="0" max="60"></div>
@@ -910,6 +1000,10 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
   <div class="page-header"><div class="page-title">Export / Import</div></div>
   <div style="max-width:720px">
 
+    <!-- Sur mobile la barre latérale est masquée : le sélecteur de mode se replie ici,
+         dans l'onglet « Plus », plutôt que de flotter au-dessus de la barre du bas. -->
+    <div id="vb-mode-slot-mobile" class="vb-mode-slot vb-mode-slot-mobile"></div>
+
     <div class="export-section">
       <div style="font-size:14px;font-weight:600;margin-bottom:12px">🖨️ Impression PDF</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -927,7 +1021,8 @@ select.filter-sel{border:0.5px solid var(--border2);border-radius:var(--radius-s
       </div>
       <div style="font-size:12px;color:#7c3aed;margin-bottom:12px">
         Une copie horodatée est déposée automatiquement dans <b>VB-Factory/backups/</b> au premier
-        enregistrement de chaque journée. Les <b id="vb-drive-retention-label">30</b> plus récentes sont conservées.
+        enregistrement de chaque journée, ainsi qu'<b>avant chaque import ou remise à zéro</b>
+        (fichiers <b>vb-factory-avant-…</b>). Les <b id="vb-drive-retention-label">30</b> plus récentes sont conservées.
       </div>
 
       <div id="vb-backup-list" style="background:#fff;border:1px solid #e9d5ff;border-radius:8px;overflow:hidden">
@@ -1028,16 +1123,28 @@ const VB_GOOGLE_CLIENT_ID = '858850894263-hhll03e1mrq7pprf9u54mfka0vb78nck.apps.
 const VB_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const VB_DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const VB_DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
-const VB_DRIVE_FOLDER_NAME = 'VB-Factory';
+// ─── Bac à sable ───
+// index.html?bac-a-sable=1 ouvre la même application sur un dossier Drive et un
+// cache local entièrement distincts. Permet d'essayer une nouveauté sur ses
+// vraies données — en y important une sauvegarde — sans qu'un seul octet du
+// dossier de production puisse bouger.
+const VB_BAC_A_SABLE = /[?&]bac-a-sable=1(&|$)/.test(location.search);
+if(VB_BAC_A_SABLE){
+  document.body.classList.add('vb-sandbox');
+  document.title = 'BAC À SABLE — ' + document.title;
+}
+const VB_SUFFIXE = VB_BAC_A_SABLE ? '_essai' : '';
+
+const VB_DRIVE_FOLDER_NAME = VB_BAC_A_SABLE ? 'VB-Factory-essai' : 'VB-Factory';
 const VB_DRIVE_BACKUPS_NAME = 'backups';
 const VB_DRIVE_DATA_NAME = 'vb-factory-data.json';
 const VB_DRIVE_RETENTION = 30;   // sauvegardes quotidiennes conservées
 const VB_DRIVE_DEBOUNCE_MS = 4000;   // laisse retomber une rafale de modifications
 const VB_DRIVE_MAX_WAIT_MS = 30000;  // mais on ne diffère jamais au-delà
-const VB_DRIVE_IDS_KEY = 'vb_drive_ids';
-const VB_DRIVE_DIRTY_KEY = 'vb_drive_dirty';
-const VB_DRIVE_BACKUP_DAY_KEY = 'vb_drive_backup_day';
-const VB_DRIVE_TOKEN_KEY = 'vb_drive_token';
+const VB_DRIVE_IDS_KEY = 'vb_drive_ids' + VB_SUFFIXE;
+const VB_DRIVE_DIRTY_KEY = 'vb_drive_dirty' + VB_SUFFIXE;
+const VB_DRIVE_BACKUP_DAY_KEY = 'vb_drive_backup_day' + VB_SUFFIXE;
+const VB_DRIVE_TOKEN_KEY = 'vb_drive_token' + VB_SUFFIXE;
 
 let vbCurrentUser = null;        // {user_id, username, role} — consommé par l'UI existante
 let vbDriveTokenClient = null;
@@ -1302,6 +1409,32 @@ async function vbDriveRenderBackupList(){
   }
 }
 
+// Point de restauration créé AVANT une opération destructrice (import, remise à zéro).
+// En production uniquement : en démo rien n'atteint Drive, la sauvegarde n'aurait pas de sens.
+// Renvoie true si l'opération peut se poursuivre, false si l'utilisateur préfère renoncer.
+async function vbDriveBackupAvantOperation(libelle){
+  if(typeof vbGetMode === 'function' && vbGetMode() !== 'production') return true;
+  if(!vbDriveReady || !vbDriveIds.fileId || !vbDriveIds.backupsId){
+    return confirm('Aucune sauvegarde préalable n\'a pu être créée : Google Drive n\'est pas connecté.\n\n'
+      + 'L\'opération « ' + libelle + ' » modifiera vos données sans point de restauration.\n\nContinuer quand même ?');
+  }
+  try{
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    await vbDriveUploadNow();   // on archive l'état d'avant, pas un état périmé
+    await vbDriveFetch(VB_DRIVE_API + '/files/' + vbDriveIds.fileId + '/copy?fields=id', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'vb-factory-avant-' + stamp + '.json', parents: [vbDriveIds.backupsId] })
+    });
+    vbDrivePruneBackups().catch(() => {});
+    showNotification('🛟 Point de restauration créé avant : ' + libelle, 3500);
+    return true;
+  }catch(e){
+    return confirm('La sauvegarde préalable a échoué (' + e.message + ').\n\n'
+      + 'L\'opération « ' + libelle + ' » modifierait vos données sans point de restauration.\n\nContinuer quand même ?');
+  }
+}
+
 async function vbDriveBackupNow(){
   if(!vbDriveReady){ showNotification('⚠️ Connectez-vous à Google d\'abord'); return; }
   try{
@@ -1332,6 +1465,8 @@ async function vbDriveDownloadBackup(fileId, name){
 
 async function vbDriveRestoreBackup(fileId, name){
   if(!confirm('Restaurer « ' + name + ' » ?\n\nToutes les données actuelles seront remplacées par celles de cette sauvegarde.')) return;
+  // L'état courant est lui aussi archivé : se tromper de sauvegarde reste rattrapable.
+  if(!await vbDriveBackupAvantOperation('restauration de « ' + name + ' »')) return;
   try{
     const res = await vbDriveFetch(VB_DRIVE_API + '/files/' + fileId + '?alt=media');
     const doc = await res.json();
@@ -1625,6 +1760,26 @@ function snapshotAndIncrement(p,comment=''){
   p.history.push({indice:getProjectIndice(p),date:new Date().toISOString(),comment,tasks:p.tasks.map(t=>({name:t.name,start_date:t.start_date,end_date:t.end_date}))});
   p.indice=(p.indice||0)+1;save();
 }
+// Aucune date de planning ne doit tomber un samedi ou un dimanche : on ne démarre ni ne
+// termine une intervention le week-end. Toute date qui y tombe glisse au lundi suivant.
+// Appliqué à tous les calculs de dates, pas seulement à ceux de l'assistant : la
+// propagation des dépendances produisait déjà des dates de week-end.
+function vbLundiSiWeekEnd(iso){
+  if(!iso) return iso;
+  const d=new Date(iso+'T12:00:00');   // midi : à l'abri des décalages de fuseau
+  if(isNaN(d)) return iso;
+  const j=d.getDay();
+  if(j===6) d.setDate(d.getDate()+2);  // samedi → lundi
+  else if(j===0) d.setDate(d.getDate()+1); // dimanche → lundi
+  else return iso;
+  return d.toISOString().slice(0,10);
+}
+function vbEstWeekEnd(iso){
+  if(!iso) return false;
+  const j=new Date(iso+'T12:00:00').getDay();
+  return j===0||j===6;
+}
+
 function propagateDeps(p,idx){
   const changed=new Set([idx]);let iter=0;
   while(iter++<50){let any=false;
@@ -1634,9 +1789,9 @@ function propagateDeps(p,idx){
       const anchorDate=(t.dep_anchor==='start')?dep?.start_date:dep?.end_date;
       if(!anchorDate)return;
       const ns=new Date(anchorDate);ns.setDate(ns.getDate()+(parseInt(t.dep_offset)||0));
-      const nss=ns.toISOString().slice(0,10);
+      const nss=vbLundiSiWeekEnd(ns.toISOString().slice(0,10));
       if(nss!==t.start_date){
-        if(t.start_date&&t.end_date){const d=Math.round((new Date(t.end_date)-new Date(t.start_date))/86400000);const ne=new Date(ns);ne.setDate(ne.getDate()+d);t.end_date=ne.toISOString().slice(0,10);}
+        if(t.start_date&&t.end_date){const d=Math.round((new Date(t.end_date)-new Date(t.start_date))/86400000);const ne=new Date(nss);ne.setDate(ne.getDate()+d);t.end_date=vbLundiSiWeekEnd(ne.toISOString().slice(0,10));}
         t.start_date=nss;changed.add(i);any=true;
       }
     });if(!any)break;
@@ -1651,9 +1806,9 @@ function vbRecalcFromDep(p,ti){
   if(!anchorDate)return;
   const dur=(t.start_date&&t.end_date)?Math.round((new Date(t.end_date)-new Date(t.start_date))/86400000):(parseInt(t.duration)||0);
   const ns=new Date(anchorDate);ns.setDate(ns.getDate()+(parseInt(t.dep_offset)||0));
-  t.start_date=ns.toISOString().slice(0,10);
-  const ne=new Date(ns);ne.setDate(ne.getDate()+dur);
-  t.end_date=ne.toISOString().slice(0,10);
+  t.start_date=vbLundiSiWeekEnd(ns.toISOString().slice(0,10));
+  const ne=new Date(t.start_date);ne.setDate(ne.getDate()+dur);
+  t.end_date=vbLundiSiWeekEnd(ne.toISOString().slice(0,10));
 }
 // Déplace la tâche fromIdx à la position toIdx dans le tableau, en ré-indexant tous les
 // dep_task_idx (qui pointent par position) pour qu'ils continuent de désigner la bonne tâche.
@@ -2656,7 +2811,7 @@ function renderProjectDetail(id){
     ${p.type_machine?`<div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Type machine</span><span class="badge badge-${p.type_machine}" style="font-size:11px">${vbEsc(FL_TYPE_LABELS[p.type_machine]||p.type_machine)}</span></div>`:''}
     ${p.type_projet==='retrofit'?`<div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Projet</span><span style="background:var(--coral-50);color:var(--coral-800);padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">Retrofit</span></div>`:''}
   </div>`;
-  renderDetailKPIs(p);renderDetailTasks(p);vbRenderReservesTab(p);
+  renderDetailKPIs(p);renderDetailTasks(p);vbRenderReservesTab(p);vbFtRenderTab(p);
   // Init Gantt inline — centré sur la date de début du projet
   if(p.start_date)projGanttStart=new Date(p.start_date);
   else projGanttStart=new Date();
@@ -3242,13 +3397,17 @@ function renderAnchors(){
   </div>`).join('');
 }
 function setAnchorDate(ti,val){
+  if(val&&vbEstWeekEnd(val)){
+    val=vbLundiSiWeekEnd(val);
+    showNotification('📅 Date reportée au lundi '+val+' (week-end)');
+  }
   formTasks[ti].start_date=val||null;
-  if(val&&formTasks[ti].duration){const e=new Date(val);e.setDate(e.getDate()+(parseInt(formTasks[ti].duration)||0));formTasks[ti].end_date=e.toISOString().slice(0,10);}
+  if(val&&formTasks[ti].duration){const e=new Date(val);e.setDate(e.getDate()+(parseInt(formTasks[ti].duration)||0));formTasks[ti].end_date=vbLundiSiWeekEnd(e.toISOString().slice(0,10));}
   recalcPreview();
 }
 function recalcPreview(){
   for(let it=0;it<50;it++){let chg=false;
-    formTasks.forEach((t,i)=>{if(t.dep_task_idx==null)return;const dep=formTasks[parseInt(t.dep_task_idx)];if(!dep?.end_date)return;const ns=new Date(dep.end_date);ns.setDate(ns.getDate()+(parseInt(t.dep_offset)||0));const nss=ns.toISOString().slice(0,10);if(nss!==t.start_date){const d=parseInt(t.duration)||0;const ne=new Date(ns);ne.setDate(ne.getDate()+d);t.start_date=nss;t.end_date=ne.toISOString().slice(0,10);chg=true;}});if(!chg)break;}
+    formTasks.forEach((t,i)=>{if(t.dep_task_idx==null)return;const dep=formTasks[parseInt(t.dep_task_idx)];if(!dep?.end_date)return;const ns=new Date(dep.end_date);ns.setDate(ns.getDate()+(parseInt(t.dep_offset)||0));const nss=vbLundiSiWeekEnd(ns.toISOString().slice(0,10));if(nss!==t.start_date){const d=parseInt(t.duration)||0;const ne=new Date(nss);ne.setDate(ne.getDate()+d);t.start_date=nss;t.end_date=vbLundiSiWeekEnd(ne.toISOString().slice(0,10));chg=true;}});if(!chg)break;}
   renderFormTasks();
 }
 function addFormTask(){formTasks.push({name:'',who:'',category:'testing',duration:0,start_date:null,end_date:null,actual_start:null,actual_end:null,dep_task_idx:null,dep_offset:0});renderFormTasks();}
@@ -3287,6 +3446,14 @@ function saveProject(){
 // ── CONFIG ──
 function initConfigPage(){
   document.getElementById('cfg-app-name').value=config.appName||'VB-Factory';
+  document.getElementById('cfg-gemini-key').value=vbGeminiKey();
+  const mdl=document.getElementById('cfg-gemini-model');
+  mdl.value=vbGeminiModel()===VB_GEMINI_MODEL_DEFAUT?'':vbGeminiModel();
+  mdl.placeholder=VB_GEMINI_MODEL_DEFAUT;
+  const rpl=document.getElementById('cfg-gemini-repli');
+  rpl.value=vbGeminiModelRepli()===VB_GEMINI_REPLI_DEFAUT?'':vbGeminiModelRepli();
+  rpl.placeholder=VB_GEMINI_REPLI_DEFAUT;
+  vbRenderAssistantLists();
   document.getElementById('cfg-target-gap').value=config.targetGapDays;
   document.getElementById('cfg-alert-threshold').value=config.alertThreshold;
   renderPhasesList();renderTemplatesList();
@@ -3303,7 +3470,7 @@ function renderTemplatesList(){const el=document.getElementById('templates-list'
   el.innerHTML=tpls.map((t,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg2);border-radius:6px;margin-bottom:8px"><span style="flex:1;font-size:13px;font-weight:500">${vbEsc(t.name)}</span><span style="font-size:11px;color:var(--text3)">${t.tasks.length} tâches</span><button class="btn btn-sm btn-danger" onclick="deleteTemplate(${i})">🗑</button></div>`).join('');}
 function addNewTemplate(){if(!config.templates)config.templates=JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));config.templates.push({id:'tpl_'+Date.now(),name:'Nouveau template',tasks:[]});renderTemplatesList();}
 function deleteTemplate(i){if(!confirm('Supprimer ?'))return;getTemplates().splice(i,1);renderTemplatesList();}
-function saveConfigPage(){config.appName=(document.getElementById('cfg-app-name').value||'').trim()||'VB-Factory';config.targetGapDays=parseInt(document.getElementById('cfg-target-gap').value)||5;config.alertThreshold=parseInt(document.getElementById('cfg-alert-threshold').value)||70;localStorage.setItem('kropp_config_v3',JSON.stringify(config));vbApplyAppName();if(typeof vbMarkDirty==='function')vbMarkDirty();showNotification('✅ Configuration enregistrée');showPage('dashboard');}
+function saveConfigPage(){vbGeminiSetKey(document.getElementById('cfg-gemini-key').value);vbGeminiSetModel(document.getElementById('cfg-gemini-model').value);vbGeminiSetModelRepli(document.getElementById('cfg-gemini-repli').value);config.appName=(document.getElementById('cfg-app-name').value||'').trim()||'VB-Factory';config.targetGapDays=parseInt(document.getElementById('cfg-target-gap').value)||5;config.alertThreshold=parseInt(document.getElementById('cfg-alert-threshold').value)||70;localStorage.setItem('kropp_config_v3',JSON.stringify(config));vbApplyAppName();if(typeof vbMarkDirty==='function')vbMarkDirty();showNotification('✅ Configuration enregistrée');showPage('dashboard');}
 
 // ── EXPORT ──
 function initExportPage(){
@@ -3362,11 +3529,13 @@ function exportFullBackup(){
   showNotification('✅ Backup exporté — '+projects.length+' projets');
 }
 
-function importFullBackup(){
+async function importFullBackup(){
   const f=document.getElementById('import-full-file');
   const res=document.getElementById('import-full-result');
   if(!f?.files.length){alert('Sélectionne un fichier JSON.');return;}
   const conflict=document.querySelector('input[name="import-conflict"]:checked')?.value||'skip';
+  // Un import fusionne dans les données réelles et part aussitôt dans Drive : on pose d'abord un filet.
+  if(!await vbDriveBackupAvantOperation('import d\'un backup complet')) return;
   const reader=new FileReader();
   reader.onload=e=>{
     try{
@@ -3417,10 +3586,11 @@ function importFullBackup(){
   reader.readAsText(f.files[0]);
 }
 
-function importLegacyBackup(){
+async function importLegacyBackup(){
   const f=document.getElementById('import-legacy-file');
   const res=document.getElementById('import-legacy-result');
   if(!f?.files.length){alert('Sélectionne un fichier JSON.');return;}
+  if(!await vbDriveBackupAvantOperation('import d\'un backup legacy')) return;
   const reader=new FileReader();
   reader.onload=e=>{
     try{
@@ -3456,9 +3626,10 @@ function importLegacyBackup(){
   reader.readAsText(f.files[0]);
 }
 
-function resetAllProjects(){
-  if(!confirm('Supprimer TOUS les projets du localStorage ?'))return;
-  if(!confirm('Confirmation finale — cette action est irréversible (le fichier backup JSON n\'est pas affecté).'))return;
+async function resetAllProjects(){
+  if(!confirm('Supprimer TOUS les projets ?'))return;
+  if(!confirm('Confirmation finale.\n\nUn point de restauration va être déposé dans Drive juste avant : vous pourrez revenir en arrière depuis la liste des sauvegardes.'))return;
+  if(!await vbDriveBackupAvantOperation('remise à zéro des projets')) return;
   projects=[];save();
   showPage('dashboard');
   showNotification('🗑 Tous les projets supprimés',2000);
@@ -4510,10 +4681,1828 @@ function renderFLEtape3New(p){
 
 
 // ================================================================
+// ASSISTANT IA (Gemini)
+// ================================================================
+// La clé reste dans le navigateur et n'entre JAMAIS dans le document Drive :
+// celui-ci se synchronise entre appareils, une clé d'API n'a rien à y faire.
+// Principe directeur : le modèle ne calcule rien. Retards, échéances et
+// montants sont produits par vpBuildAlerts() ; il ne fait que hiérarchiser et
+// formuler. Un modèle à qui on demande de compter des jours se trompe.
+
+const VB_GEMINI_ROOT = 'https://generativelanguage.googleapis.com/v1beta/models';
+// Google retire régulièrement ses modèles. Le nom est donc réglable depuis Configuration :
+// une mise hors service ne doit pas exiger une intervention sur le code.
+const VB_GEMINI_MODEL_DEFAUT = 'gemini-3.6-flash';
+// Modèle de repli, essayé lorsque le principal reste saturé. Une génération plus légère
+// est moins sollicitée, donc plus souvent disponible aux heures de pointe.
+const VB_GEMINI_REPLI_DEFAUT = 'gemini-3.5-flash-lite';
+const VB_GEMINI_KEY_STORAGE = 'vb_gemini_key';
+const VB_GEMINI_MODEL_STORAGE = 'vb_gemini_model';
+const VB_GEMINI_REPLI_STORAGE = 'vb_gemini_repli';
+// Noms français des jalons, tels que l'utilisateur les prononce.
+const VB_MILESTONE_JALON_FR = {
+  installation: 'Installation mécanique',
+  mes: 'Mise en service (MES)',
+  pv_final: 'PV final / réception finale'
+};
+// Champs de la fiche de liaison, par étape. Sert à mesurer l'avancement du remplissage.
+// Réserve : une case à cocher laissée décochée vaut false, indiscernable d'une case jamais
+// vue — l'avancement est donc un minorant, ce que la consigne dit explicitement au modèle.
+const VB_FL_CHAMPS = {
+  e1: ['address','cad','comment','contact_email','contact_fn','contact_name','contact_tel','doc_de','doc_en','doc_fr','kb_azerty','kb_cyrillic','kb_qwerty','marker_10','marker_127','marker_158','marker_chars','marker_on','os_de','os_en','os_fr','plan_etude_rev','plan_impl_note','plan_impl_rev','remote_4g','remote_lan','remote_vnc','tooling_extra'],
+  e2: ['access_detail','bridge_cap','comment','crane_note','del_lv','del_sam','delivery_addr','delivery_contact','delivery_from','delivery_tel','delivery_to','fat_contact','fat_contact2','fat_date','fat_doc_pv','fat_doc_report','fat_doc_video','fat_type','fork_cap','heaviest','install_date','lift_bridge','lift_crane','lift_fork','unavail'],
+  e3: ['access_from','access_to','comment','days_note','exp_life','exp_local','exp_none','exp_travel','site_rules_detail','staff_elec','staff_meca','tech_email','tech_fn','tech_name','tech_tel','training_detail','truck_detail']
+};
+const VB_FL_ETAPE_NOM = { e1: 'Étape 1 — étude', e2: 'Étape 2 — FAT et livraison', e3: 'Étape 3 — installation' };
+
+function vbFlAvancement(p){
+  const fl = p.fiche_liaison || {};
+  const etapes = {};
+  let total = 0, remplis = 0;
+  Object.keys(VB_FL_CHAMPS).forEach(e => {
+    const d = fl[e] || {};
+    const champs = VB_FL_CHAMPS[e];
+    const n = champs.filter(c => {
+      const v = d[c];
+      return v !== undefined && v !== null && v !== '' && v !== false;
+    }).length;
+    total += champs.length; remplis += n;
+    etapes[VB_FL_ETAPE_NOM[e]] = n + '/' + champs.length + (n === 0 ? ' (non commencée)' : '');
+  });
+  return {
+    etat: remplis === 0 ? 'vide' : (remplis >= total * 0.8 ? 'quasi complète' : 'partielle'),
+    champs_renseignes: remplis + '/' + total,
+    detail: etapes
+  };
+}
+
+const VB_ASSISTANT_MAX_ALERTS = 60;   // au-delà, le contexte coûte cher sans rien apporter
+const VB_ASSISTANT_MAX_RESERVES = 40;
+const VB_ASSISTANT_MAX_MEMOIRE = 60;
+
+function vbGeminiKey(){ try{ return localStorage.getItem(VB_GEMINI_KEY_STORAGE) || ''; }catch(e){ return ''; } }
+function vbGeminiSetKey(k){ try{ localStorage.setItem(VB_GEMINI_KEY_STORAGE, (k||'').trim()); }catch(e){} }
+function vbGeminiReady(){ return !!vbGeminiKey(); }
+let vbGeminiStatut = '';   // message transitoire affiché pendant les nouvelles tentatives
+function vbGeminiModel(){ try{ return localStorage.getItem(VB_GEMINI_MODEL_STORAGE) || VB_GEMINI_MODEL_DEFAUT; }catch(e){ return VB_GEMINI_MODEL_DEFAUT; } }
+function vbGeminiModelRepli(){ try{ return localStorage.getItem(VB_GEMINI_REPLI_STORAGE) || VB_GEMINI_REPLI_DEFAUT; }catch(e){ return VB_GEMINI_REPLI_DEFAUT; } }
+function vbGeminiSetModelRepli(m){
+  try{
+    const v=(m||'').trim();
+    if(v && v!==VB_GEMINI_REPLI_DEFAUT) localStorage.setItem(VB_GEMINI_REPLI_STORAGE, v);
+    else localStorage.removeItem(VB_GEMINI_REPLI_STORAGE);
+  }catch(e){}
+}
+function vbGeminiSetModel(m){
+  try{
+    const v=(m||'').trim();
+    if(v && v!==VB_GEMINI_MODEL_DEFAUT) localStorage.setItem(VB_GEMINI_MODEL_STORAGE, v);
+    else localStorage.removeItem(VB_GEMINI_MODEL_STORAGE);
+  }catch(e){}
+}
+// Quand Google retire un modèle, sa réponse nomme le remplaçant. Plutôt que de laisser
+// l'utilisateur devant un message d'erreur, on en extrait le nom pour le lui proposer.
+function vbGeminiModeleSuggere(msg){
+  const m = /models\/([A-Za-z0-9.\-]+)/g;
+  const noms = [];
+  let x;
+  while((x = m.exec(msg || '')) !== null) noms.push(x[1]);
+  const actuel = vbGeminiModel();
+  return noms.find(n => n !== actuel) || null;
+}
+async function vbGeminiBasculerModele(nom){
+  vbGeminiSetModel(nom);
+  showNotification('✅ Modèle basculé sur ' + nom);
+  vbAssistantPush('assistant', 'Modèle basculé sur « ' + nom +' ». Reposez votre question.');
+}
+
+// Une saturation Gemini (« high demand ») est presque toujours passagère : elle dure
+// quelques secondes. Abandonner au premier refus, c'est renvoyer l'utilisateur à un
+// message d'erreur pour un incident qui se serait résolu tout seul. On réessaie donc,
+// puis on tente le modèle de repli avant de renoncer.
+const VB_GEMINI_DELAIS = [1500, 4000, 9000];
+const VB_GEMINI_TIMEOUT_MS = 45000;   // au-delà, on considère que la requête ne reviendra pas
+
+// Le modèle encadre parfois son JSON de balises Markdown, ou le tronque quand la réponse
+// est longue. Plutôt que d'annoncer « réponse illisible » et de tout perdre, on récupère
+// ce qui peut l'être — et à défaut, on affiche le texte brut : mieux vaut une réponse
+// imparfaite qu'un message d'erreur.
+function vbGeminiParse(texte){
+  const brut = String(texte || '').trim();
+  const essais = [brut];
+
+  const sansBalises = brut.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  if(sansBalises !== brut) essais.push(sansBalises);
+
+  const debut = sansBalises.indexOf('{');
+  const fin = sansBalises.lastIndexOf('}');
+  if(debut >= 0 && fin > debut) essais.push(sansBalises.slice(debut, fin + 1));
+
+  for(const e of essais){
+    try{ const o = JSON.parse(e); if(o && typeof o === 'object') return o; }catch(err){}
+  }
+  // Dernier recours : récupérer au moins le champ "reponse" d'un JSON tronqué.
+  const m = sansBalises.match(/"reponse"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  if(m){
+    try{ return { reponse: JSON.parse('"' + m[1] + '"') }; }catch(err){}
+  }
+  return { reponse: sansBalises || '(réponse vide)' };
+}
+
+function vbGeminiSurcharge(status, msg){
+  return status === 503 || status === 500 || status === 429
+    || /high demand|overload|unavailable|try again later|please retry/i.test(msg || '');
+}
+
+async function vbGeminiAppelBrut(modele, corps, cle){
+  let rep;
+  // fetch() n'expire jamais de lui-même : sous forte charge, Google peut accepter la
+  // connexion sans jamais répondre, et l'attente serait alors infinie — l'interface
+  // resterait bloquée sur « nouvelle tentative » sans recours.
+  const ctrl = new AbortController();
+  const minuteur = setTimeout(() => ctrl.abort(), VB_GEMINI_TIMEOUT_MS);
+  try{
+    rep = await fetch(VB_GEMINI_ROOT + '/' + encodeURIComponent(modele) + ':generateContent?key=' + encodeURIComponent(cle), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps), signal: ctrl.signal
+    });
+  }catch(e){
+    const expire = (e && e.name === 'AbortError');
+    const err = new Error(expire
+      ? 'Gemini n’a pas répondu dans le délai imparti.'
+      : 'Connexion impossible. Vérifiez le réseau et réessayez.');
+    err.reseau = true;   // rejouable dans les deux cas
+    throw err;
+  }finally{
+    clearTimeout(minuteur);
+  }
+  if(rep.ok) return await rep.json();
+
+  const detail = await rep.text().catch(() => '');
+  let msg = 'Erreur Gemini ' + rep.status;
+  try{ const j = JSON.parse(detail); if(j.error && j.error.message) msg = j.error.message; }catch(e){}
+  const err = new Error(msg);
+  err.status = rep.status;
+  err.brut = msg;
+  if(rep.status === 400 && /API key/i.test(msg)){ err.message = 'Clé Gemini refusée. Vérifiez-la dans Configuration.'; }
+  if(/no longer available|not found|deprecat/i.test(msg)){
+    err.message = 'Le modèle « ' + modele + ' » n’est plus disponible.';
+    err.modeleSuggere = vbGeminiModeleSuggere(msg);
+  }
+  throw err;
+}
+
+async function vbGeminiCall({ prompt, schema, history, fichiers }){
+  const cle = vbGeminiKey();
+  if(!cle) throw new Error("Aucune clé Gemini enregistrée. Ouvrez Configuration pour l'ajouter.");
+
+  const contents = [];
+  (history || []).forEach(m => contents.push({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
+  // Un PDF part tel quel : extraire son texte mélangerait libellés et valeurs
+  // (ces fiches sont des impressions d'Excel, les colonnes s'entrelacent).
+  const parts = (fichiers || []).map(f => ({ inline_data: { mime_type: f.mime, data: f.base64 } }));
+  parts.push({ text: prompt });
+  contents.push({ role: 'user', parts });
+
+  const corps = { contents, generationConfig: { temperature: 0.2 } };
+  if(schema){
+    corps.generationConfig.responseMimeType = 'application/json';
+    corps.generationConfig.responseSchema = schema;
+  }
+
+  const modeles = [vbGeminiModel()];
+  const repli = vbGeminiModelRepli();
+  if(repli && repli !== modeles[0]) modeles.push(repli);
+
+  let derniere = null;
+  for(let m = 0; m < modeles.length; m++){
+    for(let essai = 0; essai <= VB_GEMINI_DELAIS.length; essai++){
+      try{
+        const json = await vbGeminiAppelBrut(modeles[m], corps, cle);
+        const cand = (json.candidates || [])[0] || {};
+        const texte = (json.candidates || [])
+          .flatMap(c => (c.content && c.content.parts) || [])
+          .map(p => p.text || '').join('');
+        if(!texte.trim()){
+          if(cand.finishReason === 'MAX_TOKENS') throw new Error('La réponse a été coupée (trop longue). Posez une question plus ciblée.');
+          throw new Error("L'assistant n'a rien renvoyé. Reformulez votre question.");
+        }
+        if(m > 0) showNotification('ℹ️ Réponse obtenue via le modèle de repli');
+        if(!schema) return texte;
+        const obj = vbGeminiParse(texte);
+        if(cand.finishReason === 'MAX_TOKENS' && obj.reponse){
+          obj.reponse += '\n\n(Réponse coupée par la limite de longueur : les opérations proposées peuvent être incomplètes.)';
+        }
+        return obj;
+      }catch(e){
+        derniere = e;
+        const rejouable = e.reseau || vbGeminiSurcharge(e.status, e.brut);
+        if(!rejouable) throw e;                      // clé refusée, modèle retiré : inutile d'insister
+        if(essai === VB_GEMINI_DELAIS.length) break; // on passe au modèle suivant
+        vbGeminiStatut = 'Modèle saturé — nouvelle tentative ' + (essai + 1) + '/' + VB_GEMINI_DELAIS.length + '…';
+        if(typeof vbAssistantRender === 'function') vbAssistantRender();
+        await new Promise(r => setTimeout(r, VB_GEMINI_DELAIS[essai]));
+        // Le statut est remis à zéro ici, après l'attente : le vider dans un finally
+        // l'effaçait pendant que le message était encore affiché à l'écran.
+        vbGeminiStatut = '';
+      }
+    }
+  }
+
+  const err = derniere || new Error('Appel Gemini impossible.');
+  if(vbGeminiSurcharge(err.status, err.brut)){
+    err.message = 'Gemini est saturé en ce moment. J’ai réessayé '
+      + VB_GEMINI_DELAIS.length + ' fois' + (modeles.length > 1 ? ', y compris avec le modèle de repli' : '')
+      + ', sans succès. Réessayez dans quelques minutes.';
+    err.saturation = true;
+  }
+  throw err;
+}
+
+// ─── Les faits, calculés par l'application ───
+function vbAssistantFacts(){
+  const today = new Date();
+  const alerts = (typeof vpBuildAlerts === 'function' ? vpBuildAlerts() : []) || [];
+  const risques = (typeof vpBuildRiskProjects === 'function' ? vpBuildRiskProjects(alerts) : []) || [];
+
+  const ligneAlerte = a => ({
+    projet: a.project,
+    tache: a.task,
+    responsable: a.who || null,
+    categorie: a.cat,
+    type: a.type,                                  // late | soon | payment | quality
+    jours: a.days,                                 // négatif = en retard
+    echeance: a.days < 0 ? 'dépassée de ' + Math.abs(a.days) + ' j' : 'dans ' + a.days + ' j'
+  });
+
+  // Réserves ouvertes : dépassées, ou dont l'échéance tombe dans les 45 jours
+  const reserves = [];
+  (projects || []).filter(p => p.status !== 'cloture').forEach(p => {
+    (p.reserves || []).forEach(r => {
+      if(typeof vbResIsClosed === 'function' && vbResIsClosed(r)) return;
+      if(!r.echeance) return;
+      const j = Math.round((new Date(r.echeance) - today) / 86400000);
+      if(j > 45) return;
+      reserves.push({
+        projet: p.name,
+        description: (r.description || '').slice(0, 180),
+        responsable: r.responsable || null,
+        echeance: j < 0 ? 'dépassée de ' + Math.abs(j) + ' j' : 'dans ' + j + ' j',
+        jours: j
+      });
+    });
+  });
+  reserves.sort((a, b) => a.jours - b.jours);
+
+  // Inventaire des projets actifs avec l'index de chaque tâche : c'est ce qui permet au
+  // modèle de désigner une cible sans ambiguïté, plutôt que de la décrire en toutes lettres.
+  const inventaire = (projects || []).filter(p => p.status !== 'cloture').map(p => ({
+    id: p.id,
+    nom: p.name,
+    statut: p.status,
+    fiche_liaison: vbFlAvancement(p),
+    taches: (p.tasks || []).map((t, i) => ({
+      i,
+      nom: t.name || 'Sans nom',
+      debut: t.start_date || null,
+      fin: t.end_date || null,
+      // Le réalisé : permet de répondre à « qu'est-ce qui est déjà fait ? » et d'avertir
+      // avant d'écraser une saisie existante.
+      reel_debut: t.actual_start || null,
+      reel_fin: t.actual_end || null,
+      categorie: t.category || null,
+      // Le jalon est décisif : les tâches sont souvent nommées en anglais (« Set up of the
+      // machine »), alors que l'utilisateur dit « la mise en service ». Sans ce tag, le
+      // modèle devrait deviner de quelle tâche il s'agit.
+      jalon: t.milestone ? (VB_MILESTONE_JALON_FR[t.milestone] || t.milestone) : null,
+      depend_de: (t.dep_task_idx != null ? Number(t.dep_task_idx) : null)
+    }))
+  }));
+
+  return {
+    date_du_jour: today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+    date_iso: today.toISOString().slice(0, 10),
+    semaine_iso: (typeof vbIsoWeekNumber === 'function' ? vbIsoWeekNumber(today) : null),
+    projets_actifs: (projects || []).filter(p => p.status !== 'cloture').length,
+    projets: inventaire,
+    en_retard: alerts.filter(a => a.type === 'late').slice(0, VB_ASSISTANT_MAX_ALERTS).map(ligneAlerte),
+    a_venir_7j: alerts.filter(a => a.type === 'soon').slice(0, VB_ASSISTANT_MAX_ALERTS).map(ligneAlerte),
+    paiements: alerts.filter(a => a.type === 'payment').slice(0, VB_ASSISTANT_MAX_ALERTS).map(ligneAlerte),
+    donnees_a_corriger: alerts.filter(a => a.type === 'quality').slice(0, 20).map(ligneAlerte),
+    projets_a_risque: risques.slice(0, 8).map(r => ({ projet: r.name, score: r.score, motifs: vpRiskReasons(r) })),
+    reserves_ouvertes: reserves.slice(0, VB_ASSISTANT_MAX_RESERVES),
+    memoire: (config.assistantMemoire || []).slice(-VB_ASSISTANT_MAX_MEMOIRE)
+  };
+}
+
+const VB_ASSISTANT_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    reponse: { type: 'STRING', description: "Réponse à l'utilisateur, en français, concise et directement actionnable." },
+    memoire: {
+      type: 'ARRAY',
+      description: "Précisions DURABLES données par l'utilisateur et absentes des données (report accordé, attente client, tâche déjà faite). Vide si rien de tel.",
+      items: { type: 'STRING' }
+    },
+    idees: {
+      type: 'ARRAY',
+      description: "Souhaits d'évolution de l'application exprimés par l'utilisateur. Vide s'il n'en exprime aucun.",
+      items: { type: 'STRING' }
+    },
+    actions: {
+      type: 'ARRAY',
+      description: "Opérations à PROPOSER à l'utilisateur. Elles ne sont jamais exécutées sans sa validation. Vide s'il ne demande rien de tel.",
+      items: {
+        type: 'OBJECT',
+        properties: {
+          type: { type: 'STRING', description: "'date' décale une tâche prévue · 'date_reelle' enregistre ce qui s'est réellement passé · 'ajout_tache' crée une tâche ou un jalon · 'gantt' produit l'image du planning" },
+          projet_id: { type: 'NUMBER', description: "Identifiant du projet, repris tel quel depuis l'inventaire" },
+          tache_index: { type: 'NUMBER', description: "Index 'i' de la tâche dans l'inventaire ('date' et 'date_reelle')" },
+          nouvelle_date: { type: 'STRING', description: "Nouvelle date de DÉBUT prévue, AAAA-MM-JJ (type 'date')" },
+          date_reelle_debut: { type: 'STRING', description: "Date de réalisation effective, AAAA-MM-JJ (type 'date_reelle')" },
+          date_reelle_fin: { type: 'STRING', description: "Date de fin effective, AAAA-MM-JJ (type 'date_reelle'). Pour un événement ponctuel — un paiement, un jalon — mettre la même valeur qu'au début." },
+          nom: { type: 'STRING', description: "Nom de la tâche à créer (type 'ajout_tache')" },
+          categorie: { type: 'STRING', description: "Catégorie parmi : payment, reception, installation, testing, logistics, training, misc (type 'ajout_tache')" },
+          date_debut: { type: 'STRING', description: "Date de début prévue de la tâche à créer, AAAA-MM-JJ (type 'ajout_tache')" },
+          duree: { type: 'NUMBER', description: "Durée en jours de la tâche à créer ; 0 pour un jalon ponctuel (type 'ajout_tache')" },
+          responsable: { type: 'STRING', description: "Qui réalise la tâche à créer — souvent le client pour un paiement (type 'ajout_tache')" },
+          libelle: { type: 'STRING', description: "Description courte et lisible de l'opération" }
+        },
+        required: ['type', 'projet_id']
+      }
+    }
+  },
+  required: ['reponse']
+};
+
+function vbAssistantPrompt(question){
+  const faits = vbAssistantFacts();
+  return `Tu es l'assistant de suivi de VB-Factory, outil de pilotage de projets d'installation de machines industrielles chez Vernet Behringer. Tu assistes le chargé d'affaires.
+
+Voici l'état réel de ses projets, calculé par l'application. Ces chiffres sont exacts :
+
+${JSON.stringify(faits, null, 1)}
+
+Règles impératives :
+- N'invente aucune date, aucun montant, aucun nom de projet. Utilise EXCLUSIVEMENT ce qui figure ci-dessus.
+- Ne recalcule pas les délais : les champs "echeance" et "jours" sont déjà justes, reprends-les tels quels.
+- Priorise : ce qui est en retard et les paiements passent avant le reste.
+- Sois bref et concret. Des puces, pas de paragraphes. Nomme toujours le projet concerné.
+- Si une information demandée n'est pas dans les données, dis-le franchement plutôt que de supposer.
+- La section "memoire" contient ce que l'utilisateur t'a précisé auparavant : tiens-en compte, elle prime sur les données brutes.
+- Chaque projet porte un champ "fiche_liaison" indiquant son avancement de remplissage. Une case à cocher décochée y compte comme non renseignée : annonce donc ces chiffres comme un minimum, sans affirmer qu'une fiche est incomplète sur la seule foi du compte.
+- Si l'utilisateur t'apprend un fait durable (report accordé, attente d'un client, tâche déjà réalisée), reporte-le dans le champ "memoire".
+- S'il exprime un souhait d'évolution de l'application elle-même, reporte-le dans le champ "idees".
+
+Modifications de planning :
+- S'il annonce une nouvelle date pour une tâche, n'en parle pas au passé : produis une entrée dans "actions" de type "date", avec le "projet_id" et le "tache_index" repris de l'inventaire, et la nouvelle date de début en AAAA-MM-JJ.
+- Ne calcule PAS les conséquences du décalage : l'application recalcule elle-même les tâches dépendantes et te montrera le résultat. Contente-toi de désigner la tâche et sa nouvelle date.
+- Si l'année n'est pas précisée, déduis-la du champ "date_iso" ci-dessus en retenant l'occurrence la plus proche.
+- Les tâches portent souvent un nom anglais. Quand l'utilisateur parle d'un jalon — « mise en service », « MES », « installation », « PV final », « réception finale » — fie-toi au champ "jalon" de l'inventaire, pas au nom de la tâche.
+- Si tu hésites entre deux tâches ou deux projets, ne propose rien : demande lequel.
+- S'il réclame le planning en image, produis une action de type "gantt" avec le "projet_id".
+
+Réalisé et création :
+- Quand il t'annonce qu'une chose A EU LIEU — « le client a payé », « l'installation est terminée », « la FAT a été faite hier » — c'est une date RÉELLE : produis une action "date_reelle", jamais "date". Décaler le prévisionnel effacerait ce qui était planifié.
+- « ce jour », « aujourd'hui » désignent la date du champ "date_iso" ci-dessus.
+- Renseigne les dates au format AAAA-MM-JJ, jamais en JJ/MM/AAAA.
+- Début et fin sont deux champs distincts. S'il donne les deux — « du 21/09 au 01/10 » — remplis les deux ; s'il n'en donne qu'un, ne remplis que celui-là et laisse l'autre vide, au lieu d'y recopier le premier : une intervention de dix jours ne se résume pas à une date unique.
+- Pour un événement ponctuel (paiement, jalon), et pour lui seul, renseigne la même valeur en début et en fin.
+- Une année à trois chiffres est une faute de frappe : corrige-la d'après le contexte (« 01/10/226 » vaut 2026-10-01).
+- Quand il demande d'ajouter une tâche ou un jalon — « rajoute un jalon de paiement », « ajoute une formation » — produis une action "ajout_tache" avec le nom, la catégorie, la date de début et la durée (0 pour un jalon). Un acompte ou un paiement relève de la catégorie "payment", et le responsable est le client.
+- Ces opérations sont possibles : ne réponds jamais que tu ne peux pas modifier les données. Tu proposes, l'utilisateur valide.
+- Dans "reponse", annonce ce que tu proposes ; c'est lui qui validera.
+
+Question : ${question}`;
+}
+
+// ─── Persistance (config voyage dans le document Drive) ───
+function vbSaveConfig(){
+  try{ localStorage.setItem('kropp_config_v3', JSON.stringify(config)); }
+  catch(e){ vbShowStorageFailureWarning('kropp_config_v3', e); }
+  if(typeof vbMarkDirty === 'function') vbMarkDirty();
+}
+
+let vbAssistantHistory = [];   // volatile : le fil repart à zéro à chaque session
+let vbAssistantBusy = false;
+let vbAssistantAbandon = false;
+let vbAssistantDerniereQuestion = '';
+let vbAssistantDernierTexte = '';   // la phrase du modèle : elle cite souvent la date
+
+function vbAssistantOpen(){
+  let panel = document.getElementById('vb-assistant-panel');
+  if(!panel){
+    panel = document.createElement('div');
+    panel.id = 'vb-assistant-panel';
+    panel.style.cssText = 'position:fixed;top:0;right:0;bottom:0;width:420px;max-width:100vw;background:#fff;z-index:9600;'
+      + 'box-shadow:-4px 0 24px rgba(0,0,0,0.14);display:flex;flex-direction:column;font-family:inherit';
+    panel.innerHTML =
+      '<div style="padding:14px 16px;border-bottom:1px solid var(--border,#e8e8e5);display:flex;align-items:center;gap:10px">'
+      + '<img src="./assets/icone.svg" alt="" style="width:26px;height:26px;border-radius:7px">'
+      + '<div style="flex:1"><div style="font-weight:700;font-size:14px">Assistant</div>'
+      + '<div style="font-size:11px;color:var(--text3,#999)">Adossé à vos données réelles</div></div>'
+      + '<button onclick="vbAssistantClose()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;padding:2px 6px">✕</button>'
+      + '</div>'
+      + '<div id="vb-assistant-quick" style="padding:10px 16px;border-bottom:1px solid var(--border,#e8e8e5);display:flex;gap:6px;flex-wrap:wrap">'
+      + '<button class="btn btn-sm" onclick="vbAssistantAsk(\'Que dois-je absolument faire aujourd\\u2019hui ?\')">Aujourd’hui</button>'
+      + '<button class="btn btn-sm" onclick="vbAssistantAsk(\'Que dois-je faire cette semaine ?\')">Cette semaine</button>'
+      + '<button class="btn btn-sm" onclick="vbAssistantAsk(\'Quelles sont mes priorités de ce mois ?\')">Ce mois</button>'
+      + '</div>'
+      + '<div id="vb-assistant-messages" style="flex:1;overflow-y:auto;padding:16px;font-size:13px;line-height:1.55"></div>'
+      + '<div style="padding:12px 16px;border-top:1px solid var(--border,#e8e8e5)">'
+      + '<div style="display:flex;gap:8px;align-items:flex-end">'
+      + '<textarea id="vb-assistant-input" rows="2" placeholder="Posez votre question…" '
+      + 'style="flex:1;resize:none;padding:9px 11px;border:1px solid var(--border,#e8e8e5);border-radius:8px;font:inherit;font-size:13px;box-sizing:border-box" '
+      + 'onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();vbAssistantSend()}"></textarea>'
+      + '<button class="btn btn-primary" onclick="vbAssistantSend()" style="padding:9px 14px">Envoyer</button>'
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--text3,#aaa);margin-top:7px">Entrée pour envoyer · Maj+Entrée pour aller à la ligne</div>'
+      + '</div>';
+    document.body.appendChild(panel);
+    if(!vbAssistantHistory.length) vbAssistantWelcome();
+  }
+  panel.style.display = 'flex';
+  const inp = document.getElementById('vb-assistant-input');
+  if(inp) inp.focus();
+}
+
+function vbAssistantClose(){
+  const p = document.getElementById('vb-assistant-panel');
+  if(p) p.style.display = 'none';
+}
+
+function vbAssistantWelcome(){
+  if(!vbGeminiReady()){
+    vbAssistantPush('assistant',
+      "Pour m'utiliser, ajoutez une clé Gemini dans Configuration → Assistant IA. "
+      + "Elle reste sur cet appareil et n'est jamais envoyée dans votre Drive.");
+    return;
+  }
+  const n = (projects || []).filter(p => p.status !== 'cloture').length;
+  vbAssistantPush('assistant', 'Bonjour. Vous suivez ' + n + ' projet(s) actif(s). Demandez-moi ce qui est prioritaire, ou utilisez les raccourcis ci-dessus.');
+}
+
+function vbAssistantPush(role, texte){
+  vbAssistantHistory.push({ role, text: texte });
+  vbAssistantRender();
+}
+
+function vbAssistantRender(){
+  const box = document.getElementById('vb-assistant-messages');
+  if(!box) return;
+  box.innerHTML = vbAssistantHistory.map(m => {
+    // Les cartes d'action portent du HTML construit par l'application, jamais par le modèle.
+    if(m.role === 'carte') return m.html || '';
+    const corps = vbEsc(m.text).replace(/\n/g, '<br>');
+    if(m.role === 'user'){
+      return '<div style="margin-bottom:14px;text-align:right"><div style="display:inline-block;background:var(--purple-600,#534AB7);color:#fff;'
+        + 'padding:9px 12px;border-radius:12px 12px 3px 12px;max-width:85%;text-align:left">' + corps + '</div></div>';
+    }
+    return '<div style="margin-bottom:14px"><div style="display:inline-block;background:#f4f3f9;padding:9px 12px;'
+      + 'border-radius:12px 12px 12px 3px;max-width:92%">' + corps + '</div></div>';
+  }).join('');
+  if(vbAssistantBusy){
+    const etat = vbGeminiStatut || 'L’assistant réfléchit…';
+    const couleur = vbGeminiStatut ? '#b45309' : 'var(--text3,#999)';
+    box.innerHTML += '<div style="color:' + couleur + ';font-size:12px;font-style:italic">' + vbEsc(etat)
+      + ' <button onclick="vbAssistantAbandonner()" style="background:none;border:none;color:#888;font:inherit;font-size:11px;cursor:pointer;text-decoration:underline">abandonner</button></div>';
+  }
+  box.scrollTop = box.scrollHeight;
+}
+
+// Reprendre la main sans recharger la page : la requête en cours sera ignorée.
+function vbAssistantAbandonner(){
+  vbAssistantAbandon = true;
+  vbAssistantBusy = false;
+  vbGeminiStatut = '';
+  vbAssistantPush('assistant', 'Demande abandonnée. Vous pouvez reformuler.');
+}
+
+function vbAssistantSend(){
+  const inp = document.getElementById('vb-assistant-input');
+  if(!inp) return;
+  const q = inp.value.trim();
+  if(!q) return;
+  inp.value = '';
+  vbAssistantAsk(q);
+}
+
+async function vbAssistantAsk(question){
+  if(vbAssistantBusy) return;
+  vbAssistantOpen();
+  vbAssistantPush('user', question);
+  if(!vbGeminiReady()){
+    vbAssistantPush('assistant', "Aucune clé Gemini enregistrée. Ajoutez-la dans Configuration → Assistant IA.");
+    return;
+  }
+  vbAssistantBusy = true;
+  vbAssistantAbandon = false;
+  vbAssistantDerniereQuestion = question;
+  vbAssistantRender();
+  try{
+    // L'historique transmis exclut le dernier message : il part dans le prompt,
+    // accompagné des faits à jour.
+    const hist = vbAssistantHistory.filter(m => m.role === 'user' || m.role === 'assistant').slice(0, -1).slice(-8);
+    const res = await vbGeminiCall({
+      prompt: vbAssistantPrompt(question),
+      schema: VB_ASSISTANT_SCHEMA,
+      history: hist
+    });
+    if(vbAssistantAbandon) return;   // l'utilisateur est passé à autre chose
+    vbAssistantBusy = false;
+    vbAssistantDernierTexte = res.reponse || '';
+    vbAssistantPush('assistant', res.reponse || '(réponse vide)');
+    if(Array.isArray(res.actions) && res.actions.length) vbAssistantProposer(res.actions);
+
+    let touche = false;
+    if(Array.isArray(res.memoire) && res.memoire.length){
+      config.assistantMemoire = (config.assistantMemoire || []).concat(
+        res.memoire.map(t => ({ date: new Date().toISOString().slice(0, 10), texte: String(t) })));
+      touche = true;
+      showNotification('🧠 ' + res.memoire.length + ' précision(s) retenue(s)');
+    }
+    if(Array.isArray(res.idees) && res.idees.length){
+      config.idees = (config.idees || []).concat(
+        res.idees.map(t => ({ date: new Date().toISOString().slice(0, 10), texte: String(t) })));
+      touche = true;
+      showNotification('💡 ' + res.idees.length + ' idée(s) notée(s)');
+    }
+    if(touche) vbSaveConfig();
+  }catch(e){
+    if(vbAssistantAbandon) return;
+    vbAssistantBusy = false;
+    if(e.modeleSuggere){
+      // Google a nommé le remplaçant : on l'offre en un clic plutôt qu'en message d'erreur.
+      vbAssistantPush('assistant', '⚠️ ' + e.message);
+      vbAssistantHistory.push({ role: 'carte', text: '', html:
+        '<div style="border:1px solid #fcd34d;background:#fffbeb;border-radius:10px;padding:11px 13px;margin-top:8px">'
+        + '<div style="font-size:12px;line-height:1.5">Google recommande <b>' + vbEsc(e.modeleSuggere) + '</b>.</div>'
+        + '<button class="btn btn-primary btn-sm" style="margin-top:9px" onclick="vbGeminiBasculerModele(\'' + vbEsc(e.modeleSuggere) + '\')">'
+        + 'Basculer sur ce modèle</button></div>' });
+      vbAssistantRender();
+    } else {
+      vbAssistantPush('assistant', '⚠️ ' + e.message);
+    }
+  }
+}
+
+
+// ─── Opérations proposées par l'assistant ───
+// Le modèle désigne la cible, l'application calcule les conséquences. Un décalage de FAT
+// n'est pas un changement de date mais le décalage d'une chaîne : propagateDeps() sait le
+// faire correctement, un modèle de langage non.
+
+let vbAssistantActions = [];   // propositions en attente de validation
+
+function vbFindProjet(id){ return (projects || []).find(p => String(p.id) === String(id)) || null; }
+
+// Le modèle confond volontiers les champs de date voisins — il écrit la date dans
+// "nouvelle_date" pour une création, ou la laisse dans le libellé. Refuser pour cette
+// raison serait absurde : la date est là, il suffit d'aller la chercher.
+// Une date peut arriver en ISO ou à la française, y compris dans un champ censé être en
+// ISO : le modèle recopie volontiers la forme employée par l'utilisateur.
+function vbDateNorm(v){
+  const s = String(v || '').trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const fr = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+  if(fr) return fr[3] + '-' + String(fr[2]).padStart(2, '0') + '-' + String(fr[1]).padStart(2, '0');
+  return null;
+}
+
+// Toutes les dates d'un texte, dans l'ordre d'apparition, ISO ou françaises.
+function vbDatesDepuisTexte(txt){
+  const out = [];
+  const re = /(\d{4}-\d{2}-\d{2})|(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})/g;
+  let m;
+  while((m = re.exec(String(txt || ''))) !== null){
+    out.push(m[1] ? m[1] : m[4] + '-' + String(m[3]).padStart(2, '0') + '-' + String(m[2]).padStart(2, '0'));
+  }
+  return out.filter((v, i) => out.indexOf(v) === i);
+}
+
+// Dernier recours quand le modèle n'a rempli aucun champ de date : sa propre phrase et
+// celle de l'utilisateur la contiennent presque toujours.
+function vbDatesDeSecours(a, texte){
+  const txt = [texte, vbAssistantDerniereQuestion, a.libelle, a.nom].map(x => String(x || '')).join(' ');
+  const dates = vbDatesDepuisTexte(txt);
+  if(!dates.length) return { d: null, f: null };
+  if(dates.length >= 2) return { d: dates[0], f: dates[1] };
+  // Une seule date : « fin » sans « début » la désigne comme une fin.
+  const finSeule = /\bfin\b/i.test(txt) && !/\bd[ée]but\b|\bdemarr|\bdémarr|\bcommenc/i.test(txt);
+  return finSeule ? { d: null, f: dates[0] } : { d: dates[0], f: null };
+}
+
+function vbDateProposee(a, cles){
+  for(const c of cles){
+    const v = vbDateNorm(a[c]);
+    if(v) return v;
+  }
+  const texte = [a.libelle, a.nom, a.reponse].map(x => String(x || '')).join(' ');
+  const iso = texte.match(/\d{4}-\d{2}-\d{2}/);
+  if(iso) return iso[0];
+  const fr = texte.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(fr) return fr[3] + '-' + String(fr[2]).padStart(2, '0') + '-' + String(fr[1]).padStart(2, '0');
+  return null;
+}
+
+// tache_index n'est pas toujours fourni par le modèle. Plutôt que d'échouer, on tente de
+// retrouver la tâche par son libellé puis par son jalon, avant de passer la main.
+function vbResoudreTache(p, a){
+  const taches = p.tasks || [];
+  const ti = Number(a.tache_index);
+  if(Number.isInteger(ti) && ti >= 0 && ti < taches.length) return ti;
+
+  // À défaut de libellé, la question de l'utilisateur reste la meilleure piste : c'est lui
+  // qui a nommé la tâche, même si le modèle a omis de la reporter.
+  const texte = String(a.libelle || a.nom || vbAssistantDerniereQuestion || '').toLowerCase();
+  if(!texte) return null;
+
+  const jalons = { mes: /mise en service|\bmes\b|commissioning|set up/, installation: /installation/, pv_final: /pv final|réception finale|final reception|\bsat\b/ };
+  for(const cle in jalons){
+    if(jalons[cle].test(texte)){
+      const i = taches.findIndex(t => t.milestone === cle);
+      if(i >= 0) return i;
+    }
+  }
+  // Seuil à 3 caractères : les sigles du métier — FAT, MES, SAT, PV — sont précisément
+  // ce qui identifie la tâche. Une liste de mots vides évite de s'accrocher aux liaisons.
+  const vides = ['pour','dans','avec','cette','cette','les','des','une','est','sur','par','aux','que','qui','del','the','and'];
+  const mots = texte.split(/[^a-zà-ÿ0-9]+/).filter(m => m.length >= 3 && !vides.includes(m));
+  let meilleur = -1, score = 0;
+  taches.forEach((t, i) => {
+    const nom = String(t.name || '').toLowerCase();
+    const n = mots.filter(m => nom.includes(m)).length;
+    if(n > score){ score = n; meilleur = i; }
+  });
+  return score > 0 ? meilleur : null;
+}
+
+// Saisie directe d'une date de réalisation quand le modèle ne l'a pas fournie.
+// Deux champs : une intervention a une durée. N'en proposer qu'un conduisait à écrire la
+// même date des deux côtés, ce qui écrase l'information utile.
+function vbCarteSaisieDate(p, ti, titre, preD, preF){
+  const idx = vbAssistantActions.push({ type: 'date_reelle', projectId: p.id, ti, debut: null, fin: null }) - 1;
+  const t = (p.tasks || [])[ti] || {};
+  const ponctuel = (Number(t.duration) === 0) || (t.start_date && t.start_date === t.end_date);
+  const jour = preD || preF || new Date().toISOString().slice(0, 10);
+  const champ = (suffixe, etiquette, valeur) =>
+    '<label style="display:flex;align-items:center;gap:7px;margin-top:5px;font-size:12px">'
+    + '<span style="width:44px;color:var(--text2,#666)">' + etiquette + '</span>'
+    + '<input type="date" id="vb-act-' + suffixe + '-' + idx + '" value="' + valeur + '" '
+    + 'style="padding:6px 9px;border:1px solid var(--border,#e8e8e5);border-radius:7px;font:inherit;font-size:13px"></label>';
+  return '<div id="vb-act-' + idx + '" style="border:1px solid #fcd34d;background:#fffbeb;border-radius:10px;padding:11px 13px;margin-top:8px">'
+    + '<div style="font-weight:700;font-size:12px;margin-bottom:3px">📅 ' + titre + '</div>'
+    + champ('debut', 'Début', preD || t.actual_start || jour)
+    + (ponctuel ? '' : champ('fin', 'Fin', preF || t.actual_end || ''))
+    + '<div style="display:flex;gap:6px;margin-top:10px">'
+    + '<button class="btn btn-primary btn-sm" onclick="vbAssistantSaisirDate(' + idx + ')">Enregistrer</button>'
+    + '<button class="btn btn-sm" onclick="vbAssistantAnnuler(' + idx + ')">Annuler</button>'
+    + '</div></div>';
+}
+
+function vbAssistantSaisirDate(idx){
+  const a = vbAssistantActions[idx];
+  if(!a) return;
+  const cd = document.getElementById('vb-act-debut-' + idx);
+  const cf = document.getElementById('vb-act-fin-' + idx);
+  const d = cd && vbDateNorm(cd.value);
+  const f = cf ? vbDateNorm(cf.value) : d;   // pas de champ fin = jalon ponctuel
+  if(!d && !f){ showNotification('⚠️ Choisissez au moins une date'); return; }
+  if(d && f && f < d){ showNotification('⚠️ La fin précède le début'); return; }
+  a.debut = d; a.fin = f || (cf ? null : d);
+  vbAssistantAppliquer(idx);
+}
+
+// Liste cliquable des tâches datées, pour trancher quand la cible reste incertaine.
+function vbCarteChoixTache(p, date, type){
+  const reel = (type === 'date_reelle');
+  const options = (p.tasks || []).map((t, i) => ({ i, t }))
+    .filter(x => x.t.start_date)
+    .map(x => {
+      const action = reel
+        ? { type: 'date_reelle', projectId: p.id, ti: x.i, debut: date, fin: date }
+        : { type: 'date', projectId: p.id, ti: x.i, nouvelleDate: date };
+      const idx = vbAssistantActions.push(action) - 1;
+      return '<button class="btn btn-sm" style="display:block;width:100%;text-align:left;margin-top:4px" onclick="vbAssistantAppliquer(' + idx + ')">'
+        + vbEsc(x.t.name || 'Tâche ' + x.i) + ' <span style="color:#888">(' + vbEsc(x.t.start_date) + ')</span></button>';
+    }).join('');
+  const titre = reel
+    ? 'Quelle tâche a été réalisée le ' + vbEsc(date) + ' ?'
+    : 'Quelle tâche décaler au ' + vbEsc(vbLundiSiWeekEnd(date)) + ' ?';
+  return '<div style="border:1px solid #fcd34d;background:#fffbeb;border-radius:10px;padding:11px 13px;margin-top:8px">'
+    + '<div style="font-weight:700;font-size:12px;margin-bottom:4px">📅 ' + titre + '</div>'
+    + '<div style="font-size:11px;color:var(--text2,#666);margin-bottom:6px">' + vbEsc(p.name) + '</div>'
+    + (options || '<div style="font-size:12px;color:#991b1b">Aucune tâche datée dans ce projet.</div>')
+    + '</div>';
+}
+
+// Applique le décalage sur une copie pour montrer l'impact réel avant toute écriture.
+function vbSimuleDecalage(p, ti, nouvelleDate){
+  const copie = JSON.parse(JSON.stringify(p));
+  const t = copie.tasks[ti];
+  if(!t) return null;
+  const avant = (p.tasks || []).map(x => ({ nom: x.name, debut: x.start_date, fin: x.end_date }));
+
+  const ancienDebut = t.start_date;
+  const debut = vbLundiSiWeekEnd(nouvelleDate);
+  if(ancienDebut && t.end_date){
+    // On conserve la durée : décaler une tâche ne la raccourcit pas.
+    const duree = Math.round((new Date(t.end_date) - new Date(ancienDebut)) / 86400000);
+    const fin = new Date(debut);
+    fin.setDate(fin.getDate() + duree);
+    t.end_date = vbLundiSiWeekEnd(fin.toISOString().slice(0, 10));
+  }
+  t.start_date = debut;
+  propagateDeps(copie, ti);
+
+  const apres = copie.tasks.map(x => ({ nom: x.name, debut: x.start_date, fin: x.end_date }));
+  const diff = [];
+  apres.forEach((a, i) => {
+    const b = avant[i];
+    if(!b) return;
+    if(a.debut !== b.debut || a.fin !== b.fin) diff.push({ i, nom: a.nom, avant: b.debut, apres: a.debut });
+  });
+  return { copie, diff, ancienDebut };
+}
+
+function vbAssistantProposer(actions){
+  const cartes = [];
+  (actions || []).forEach(a => {
+    const p = vbFindProjet(a.projet_id);
+    if(!p){ cartes.push({ erreur: 'Projet introuvable (' + vbEsc(String(a.projet_id)) + ')' }); return; }
+
+    if(a.type === 'gantt'){
+      const idx = vbAssistantActions.push({ type: 'gantt', projectId: p.id, libelle: a.libelle || ('Planning de ' + p.name) }) - 1;
+      cartes.push({ idx, titre: '🖼 Image du planning', detail: vbEsc(p.name), bouton: 'Produire l’image' });
+      return;
+    }
+
+    if(a.type === 'date_reelle'){
+      const ti = vbResoudreTache(p, a);
+      if(ti == null){
+        const quand = vbDateProposee(a, ['date_reelle_debut', 'date_reelle_fin', 'nouvelle_date', 'date_debut'])
+          || new Date().toISOString().slice(0, 10);
+        cartes.push({ choix: vbCarteChoixTache(p, quand, 'date_reelle') });
+        return;
+      }
+      const t = p.tasks[ti];
+      // Début et fin sont lus séparément : recopier l'un sur l'autre écraserait une
+      // intervention de dix jours par une date unique. On ne les confond que pour un
+      // jalon ponctuel, où début et fin coïncident par nature.
+      let d = vbDateNorm(a.date_reelle_debut);
+      let f = vbDateNorm(a.date_reelle_fin);
+      if(!d && !f){
+        const seule = vbDateProposee(a, ['nouvelle_date', 'date_debut', 'date', 'debut']);
+        if(seule){ d = seule; }
+        else {
+          const s = vbDatesDeSecours(a, vbAssistantDernierTexte);
+          d = s.d; f = s.f;
+        }
+      }
+      const ponctuel = (Number(t.duration) === 0) || (t.start_date && t.start_date === t.end_date);
+      if(ponctuel){ d = d || f; f = f || d; }
+
+      if(f && d && f < d){ const tmp = d; d = f; f = tmp; }   // inversion manifeste
+
+      if(!d && !f){
+        // La date manque vraiment : on la demande plutôt que de renvoyer une erreur sèche.
+        cartes.push({ choix: vbCarteSaisieDate(p, ti, 'Quelle date de réalisation pour « ' + vbEsc(t.name || 'cette tâche') + ' » ?', null, null) });
+        return;
+      }
+
+      const idx = vbAssistantActions.push({ type: 'date_reelle', projectId: p.id, ti, debut: d, fin: f }) - 1;
+      const lisible = (d && f && d !== f) ? ('du <b>' + vbEsc(d) + '</b> au <b>' + vbEsc(f) + '</b>')
+        : (d && f) ? ('le <b>' + vbEsc(d) + '</b>')
+        : d ? ('début le <b>' + vbEsc(d) + '</b> <span style="color:#888">(fin non renseignée)</span>')
+        : ('fin le <b>' + vbEsc(f) + '</b> <span style="color:#888">(début non renseigné)</span>');
+      const detail = '<b>' + vbEsc(p.name) + '</b><br>' + vbEsc(t.name || 'Tâche')
+        + '<div style="margin-top:6px;font-size:12px">Réalisé : ' + lisible + '</div>'
+        + (t.start_date ? '<div style="margin-top:4px;font-size:11px;color:var(--text2,#666)">Prévu le ' + vbEsc(t.start_date)
+            + ' — le prévisionnel n’est pas modifié, l’écart sera visible dans Comparaison.</div>' : '')
+        + ((t.actual_start || t.actual_end) ? '<div style="margin-top:4px;font-size:11px;color:#b45309">⚠️ Remplace le réalisé actuel ('
+            + vbEsc(t.actual_start || '—') + ' → ' + vbEsc(t.actual_end || '—') + ')</div>' : '');
+      cartes.push({ idx, titre: '✅ Date réelle', detail, bouton: 'Enregistrer' });
+      return;
+    }
+
+    if(a.type === 'ajout_tache'){
+      const nom = String(a.nom || '').trim();
+      if(!nom){ cartes.push({ erreur: 'Nom de tâche manquant' }); return; }
+      const demandee = vbDateProposee(a, ['date_debut', 'nouvelle_date', 'date_reelle_debut']);
+      const debut = demandee ? vbLundiSiWeekEnd(demandee) : null;
+      const duree = Math.max(0, Number(a.duree) || 0);
+      const cat = (typeof CAT_LABELS === 'object' && CAT_LABELS[a.categorie]) ? a.categorie : 'misc';
+
+      const idx = vbAssistantActions.push({ type: 'ajout_tache', projectId: p.id, nom, cat, debut, duree, qui: String(a.responsable || '').trim() }) - 1;
+      let detail = '<b>' + vbEsc(p.name) + '</b><br><b>' + vbEsc(nom) + '</b>'
+        + '<div style="margin-top:6px;font-size:12px">' + vbEsc(CAT_LABELS[cat] || cat)
+        + (debut ? ' · ' + vbEsc(debut) : ' · sans date')
+        + (duree ? ' · ' + duree + ' j' : ' · jalon ponctuel')
+        + (a.responsable ? ' · ' + vbEsc(a.responsable) : '') + '</div>';
+      if(debut && demandee && debut !== demandee){
+        detail += '<div style="margin-top:5px;font-size:11px;color:#b45309">⚠️ Le ' + vbEsc(demandee) + ' tombe un week-end : reporté au lundi.</div>';
+      }
+      cartes.push({ idx, titre: '➕ Nouvelle tâche', detail, bouton: 'Créer' });
+      return;
+    }
+
+    if(a.type === 'date'){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(a.nouvelle_date || '')){ cartes.push({ erreur: 'Date proposée illisible' }); return; }
+
+      const ti = vbResoudreTache(p, a);
+      if(ti == null){
+        // Le modèle n'a pas su désigner la tâche (index omis ou hors limites). Plutôt que
+        // de renvoyer un échec, on laisse l'utilisateur la choisir : il sait, lui.
+        cartes.push({ choix: vbCarteChoixTache(p, a.nouvelle_date) });
+        return;
+      }
+      const t = p.tasks[ti];
+
+      const sim = vbSimuleDecalage(p, ti, a.nouvelle_date);
+      if(!sim){ cartes.push({ erreur: 'Simulation impossible' }); return; }
+      const idx = vbAssistantActions.push({
+        type: 'date', projectId: p.id, ti, nouvelleDate: a.nouvelle_date,
+        libelle: a.libelle || ((t.name || 'Tâche') + ' → ' + a.nouvelle_date)
+      }) - 1;
+
+      const cascade = sim.diff.filter(d => d.i !== ti);
+      const retenue = vbLundiSiWeekEnd(a.nouvelle_date);
+      let detail = '<b>' + vbEsc(p.name) + '</b><br>' + vbEsc(t.name || 'Tâche') + ' : '
+        + '<span style="color:#888;text-decoration:line-through">' + vbEsc(sim.ancienDebut || '—') + '</span> → <b>' + vbEsc(retenue) + '</b>';
+      if(retenue !== a.nouvelle_date){
+        detail += '<div style="margin-top:5px;font-size:11px;color:#b45309">⚠️ Le ' + vbEsc(a.nouvelle_date)
+          + ' tombe un week-end : reporté au lundi.</div>';
+      }
+      if(cascade.length){
+        detail += '<div style="margin-top:6px;font-size:11px;color:var(--text2,#666)">'
+          + cascade.length + ' tâche(s) dépendante(s) décalée(s) :<br>'
+          + cascade.slice(0, 5).map(d => '· ' + vbEsc(d.nom) + ' ' + vbEsc(d.avant || '—') + ' → ' + vbEsc(d.apres || '—')).join('<br>')
+          + (cascade.length > 5 ? '<br>· … et ' + (cascade.length - 5) + ' autre(s)' : '')
+          + '</div>';
+      } else {
+        detail += '<div style="margin-top:6px;font-size:11px;color:var(--text2,#666)">Aucune tâche dépendante.</div>';
+      }
+      cartes.push({ idx, titre: '📅 Décalage de date', detail, bouton: 'Appliquer' });
+    }
+  });
+
+  if(!cartes.length) return;
+  const html = cartes.map(c => {
+    if(c.choix) return c.choix;
+    if(c.erreur){
+      return '<div style="border:1px solid #fca5a5;background:#fef2f2;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:12px;color:#991b1b">⚠️ ' + c.erreur + '</div>';
+    }
+    return '<div id="vb-act-' + c.idx + '" style="border:1px solid var(--purple-200,#AFA9EC);background:#faf9ff;border-radius:10px;padding:11px 13px;margin-top:8px">'
+      + '<div style="font-weight:700;font-size:12px;margin-bottom:5px">' + c.titre + '</div>'
+      + '<div style="font-size:12px;line-height:1.5">' + c.detail + '</div>'
+      + '<div style="display:flex;gap:6px;margin-top:10px">'
+      + '<button class="btn btn-primary btn-sm" onclick="vbAssistantAppliquer(' + c.idx + ')">' + c.bouton + '</button>'
+      + '<button class="btn btn-sm" onclick="vbAssistantAnnuler(' + c.idx + ')">Annuler</button>'
+      + '</div></div>';
+  }).join('');
+  vbAssistantHistory.push({ role: 'carte', text: '', html });
+  vbAssistantRender();
+}
+
+function vbAssistantFermerCarte(idx, message, couleur){
+  const el = document.getElementById('vb-act-' + idx);
+  if(el) el.outerHTML = '<div style="border:1px solid ' + couleur + ';border-radius:10px;padding:9px 12px;margin-top:8px;font-size:12px">' + message + '</div>';
+}
+
+function vbAssistantAnnuler(idx){
+  vbAssistantFermerCarte(idx, '⊘ Abandonné', '#e8e8e5');
+}
+
+async function vbAssistantAppliquer(idx){
+  const a = vbAssistantActions[idx];
+  if(!a) return;
+  const p = vbFindProjet(a.projectId);
+  if(!p){ vbAssistantFermerCarte(idx, '⚠️ Projet introuvable', '#fca5a5'); return; }
+
+  if(a.type === 'gantt'){
+    vbAssistantFermerCarte(idx, '🖼 Génération de l’image…', '#AFA9EC');
+    try{
+      const png = await vbCaptureProjectGanttPng(p);
+      if(!png) throw new Error('Ce projet n’a aucune tâche datée à représenter.');
+      vbAssistantHistory.push({ role: 'carte', text: '', html:
+        '<div style="margin-top:8px"><img src="' + png + '" alt="Planning" style="width:100%;border:1px solid var(--border,#e8e8e5);border-radius:8px">'
+        + '<a href="' + png + '" download="planning-' + vbEsc((p.name || 'projet').replace(/[^\w\-]+/g, '-')) + '.png" '
+        + 'class="btn btn-sm" style="display:inline-block;margin-top:7px;text-decoration:none">⬇ Télécharger l’image</a></div>' });
+      vbAssistantRender();
+    }catch(e){
+      vbAssistantPush('assistant', '⚠️ ' + e.message);
+    }
+    return;
+  }
+
+  if(a.type === 'date_reelle'){
+    const t = (p.tasks || [])[a.ti];
+    if(!t){ vbAssistantFermerCarte(idx, '⚠️ Tâche introuvable', '#fca5a5'); return; }
+    // Aucun report au lundi ici : un paiement reçu un samedi l'a été un samedi. La règle
+    // week-end vaut pour ce qu'on planifie, pas pour ce qui a eu lieu.
+    // Pas de snapshotAndIncrement non plus : le planning prévu ne change pas, l'indice de
+    // révision ne doit donc pas bouger — c'est la convention de updateActual().
+    // Un bout non renseigné n'efface pas ce qui était déjà saisi.
+    if(a.debut) t.actual_start = a.debut;
+    if(a.fin) t.actual_end = a.fin;
+    save();
+    vbAssistantFermerCarte(idx, '✅ Réalisé enregistré — visible dans l’onglet « Dates réelles »', '#86efac');
+    showNotification('✅ Date réelle enregistrée');
+    if(currentProjectId === p.id && typeof renderProjectDetail === 'function') renderProjectDetail(p.id);
+    else if(typeof renderDashboard === 'function' && document.getElementById('page-dashboard')?.classList.contains('active')) renderDashboard();
+    return;
+  }
+
+  if(a.type === 'ajout_tache'){
+    snapshotAndIncrement(p, 'Assistant — ajout : ' + a.nom);
+    let fin = null;
+    if(a.debut){
+      const e = new Date(a.debut);
+      e.setDate(e.getDate() + (a.duree || 0));
+      fin = vbLundiSiWeekEnd(e.toISOString().slice(0, 10));
+    }
+    p.tasks.push({
+      name: a.nom, who: a.qui || '', category: a.cat,
+      start_date: a.debut, end_date: fin, duration: a.duree,
+      actual_start: null, actual_end: null, dep_task_idx: null, dep_offset: 0
+    });
+    save();
+    vbAssistantFermerCarte(idx, '✅ Tâche créée — révision ' + getProjectIndice(p), '#86efac');
+    showNotification('✅ « ' + a.nom + ' » ajoutée');
+    if(currentProjectId === p.id && typeof renderProjectDetail === 'function') renderProjectDetail(p.id);
+    else if(typeof renderDashboard === 'function' && document.getElementById('page-dashboard')?.classList.contains('active')) renderDashboard();
+    return;
+  }
+
+  if(a.type === 'date'){
+    const t = (p.tasks || [])[a.ti];
+    if(!t){ vbAssistantFermerCarte(idx, '⚠️ Tâche introuvable', '#fca5a5'); return; }
+    const ancien = t.start_date;
+    const debut = vbLundiSiWeekEnd(a.nouvelleDate);
+
+    // snapshotAndIncrement archive l'état des tâches et incrémente l'indice de révision :
+    // la modification est datée, commentée et réversible depuis l'historique du projet.
+    // Le commentaire porte la date réellement retenue, week-end déjà corrigé.
+    snapshotAndIncrement(p, 'Assistant : ' + (t.name || 'tâche') + ' ' + (ancien || '—') + ' → ' + debut);
+    if(ancien && t.end_date){
+      const duree = Math.round((new Date(t.end_date) - new Date(ancien)) / 86400000);
+      const fin = new Date(debut);
+      fin.setDate(fin.getDate() + duree);
+      t.end_date = vbLundiSiWeekEnd(fin.toISOString().slice(0, 10));
+    }
+    t.start_date = debut;
+    propagateDeps(p, a.ti);
+    save();
+
+    vbAssistantFermerCarte(idx, '✅ Appliqué — révision ' + getProjectIndice(p) + ', consultable dans l’historique du projet', '#86efac');
+    showNotification('✅ Planning mis à jour');
+    if(typeof renderDashboard === 'function' && document.getElementById('page-dashboard')?.classList.contains('active')) renderDashboard();
+    if(currentProjectId === p.id && typeof showProjectDetail === 'function') showProjectDetail(p.id);
+  }
+}
+
+// ─── Mémoire et idées : consultation et retrait ───
+function vbRenderAssistantLists(){
+  const mem = document.getElementById('cfg-memoire-list');
+  if(mem){
+    const items = config.assistantMemoire || [];
+    mem.innerHTML = items.length
+      ? items.map((m, i) => '<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #f0f0ee">'
+          + '<div style="flex:1;font-size:12px"><span style="color:var(--text3,#999)">' + vbEsc(m.date) + '</span> — ' + vbEsc(m.texte) + '</div>'
+          + '<button class="btn btn-sm" onclick="vbForgetMemoire(' + i + ')" title="Oublier">✕</button></div>').join('')
+      : '<div style="font-size:12px;color:var(--text3,#999)">Rien de mémorisé pour l’instant.</div>';
+  }
+  const idl = document.getElementById('cfg-idees-list');
+  if(idl){
+    const items = config.idees || [];
+    idl.innerHTML = items.length
+      ? items.map((m, i) => '<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #f0f0ee">'
+          + '<div style="flex:1;font-size:12px"><span style="color:var(--text3,#999)">' + vbEsc(m.date) + '</span> — ' + vbEsc(m.texte) + '</div>'
+          + '<button class="btn btn-sm" onclick="vbRemoveIdee(' + i + ')" title="Retirer">✕</button></div>').join('')
+      : '<div style="font-size:12px;color:var(--text3,#999)">Aucune idée notée.</div>';
+  }
+}
+
+function vbForgetMemoire(i){
+  (config.assistantMemoire || []).splice(i, 1);
+  vbSaveConfig(); vbRenderAssistantLists();
+}
+function vbRemoveIdee(i){
+  (config.idees || []).splice(i, 1);
+  vbSaveConfig(); vbRenderAssistantLists();
+}
+function vbCopyIdees(){
+  const t = (config.idees || []).map(m => '- [' + m.date + '] ' + m.texte).join('\n');
+  if(!t){ showNotification('Aucune idée à copier'); return; }
+  navigator.clipboard.writeText(t).then(() => showNotification('💡 Idées copiées'),
+    () => showNotification('Copie impossible'));
+}
+
+// ================================================================
 // MODULE IMPORT FICHE TECHNIQUE (.xlsx)
 // ================================================================
 
 // Mapping cellules FT → champs VB Factory
+// ═══════════════════════════════════════════════════════════════════════════
+// LECTURE DE FICHE TECHNIQUE — extraction sémantique
+// ═══════════════════════════════════════════════════════════════════════════
+// L'ancien import (FT_CELL_MAP, plus bas) lit des cellules fixes de l'onglet
+// « HDV - Auto ». Sur une autre machine ces cellules existent toujours mais
+// contiennent autre chose : E121 vaut « tension » sur une HDV, « Emetteur » sur
+// une grenailleuse RRB et « Diamètre » sur une VPX 250-XD. L'import ne se
+// contentait donc pas d'échouer, il importait des libellés d'en-tête pris pour
+// des valeurs. Les lignes bougent d'un modèle à l'autre :
+//   tension       → E121 (Otavske) / E42 (Dexis) / E48 (RRB)
+//   nature du sol → E128 (Otavske) / E85 (Dexis) / E56 (RRB)
+// On ne lit donc plus de position : on rend la feuille en lignes lisibles, le
+// modèle désigne les valeurs, et chaque réponse est revérifiée contre la
+// cellule qu'il a citée.
+
+// Un onglet décrit une machine si (a) il est visible — les modèles non vendus
+// sont masqués dans la trame commerciale — ET (b) il porte la signature d'un
+// en-tête de FT : type de machine (D5), désignation (F5) et indice (O5).
+// Aucun des deux critères ne suffit seul : sur la trame à 3 machines, la
+// visibilité seule retient 5 onglets (dont « brouillon » et un onglet de suivi),
+// la signature seule en retient 10 (tous les modèles masqués du catalogue).
+const VB_FT_SIGNATURE = ['D5', 'F5', 'O5'];
+
+function vbFtValeurBrute(ws, adr) {
+  const c = ws && ws[adr];
+  if (!c || c.v === null || c.v === undefined) return null;
+  const t = String(c.v).trim();
+  return t === '' ? null : t;
+}
+
+function vbFtOngletsMachines(XLSX, wb) {
+  const meta = (wb.Workbook && wb.Workbook.Sheets) || [];
+  return wb.SheetNames.map((nom, i) => {
+    const masque = !!(meta[i] && meta[i].Hidden);
+    const ws = wb.Sheets[nom];
+    const signature = VB_FT_SIGNATURE.every(a => vbFtValeurBrute(ws, a));
+    return { nom, masque, signature, retenu: !masque && signature };
+  });
+}
+
+function vbFtTexteCellule(c) {
+  if (!c) return '';
+  const v = c.v;
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (typeof v === 'boolean') return v ? 'oui' : 'non';
+  return String(v).replace(/\s*\n\s*/g, ' / ').replace(/\s+/g, ' ').trim();
+}
+
+// Dans ces fiches une case à cocher vaut « ☑☐ » : les deux glyphes côte à côte,
+// c'est-à-dire un choix qui n'a PAS été tranché. Un seul glyphe est une réponse.
+// Sans cette distinction, une case intacte se lit comme un « oui ».
+function vbFtEtatCase(t) {
+  const coches = (t.match(/[☑☒✓✔]/g) || []).length;
+  const vides  = (t.match(/[☐□]/g) || []).length;
+  if (!coches && !vides) return null;
+  if (coches && vides) return 'non tranché';
+  return coches ? 'coché' : 'décoché';
+}
+
+const VB_FT_A_DEFINIR = /^(à\s*d[ée]finir|a\s*definir|\?+|tbd|à\s*confirmer|non\s*d[ée]fini|non\s*pr[ée]cis[ée])/i;
+
+// Rendu d'une feuille en lignes « 121: [C121] tension : [E121] standard : 400V ».
+// Le libellé et sa valeur se retrouvent côte à côte sur la même ligne, ce qui rend
+// l'association lisible sans avoir à deviner une géométrie.
+function vbFtLignesFeuille(XLSX, ws, opts) {
+  opts = opts || {};
+  const ref = ws && ws['!ref'];
+  if (!ref) return { lignes: [], aDefinir: [] };
+  const plage = XLSX.utils.decode_range(ref);
+  const finCol = Math.min(plage.e.c, opts.maxCol || 40);   // au-delà : colonnes parasites (jusqu'à XFD)
+  const finLig = Math.min(plage.e.r, (opts.maxLignes || 400) - 1);
+  const lignes = [], aDefinir = [];
+  for (let r = plage.s.r; r <= finLig; r++) {
+    const bouts = [];
+    for (let c = plage.s.c; c <= finCol; c++) {
+      const adr = XLSX.utils.encode_cell({ r, c });
+      const t = vbFtTexteCellule(ws[adr]);
+      if (!t) continue;
+      const etat = vbFtEtatCase(t);
+      bouts.push('[' + adr + '] ' + (etat ? t + ' («' + etat + '»)' : t));
+      if (VB_FT_A_DEFINIR.test(t)) aDefinir.push({ cellule: adr, texte: t });
+    }
+    if (bouts.length) lignes.push((r + 1) + ': ' + bouts.join('  '));
+  }
+  return { lignes, aDefinir };
+}
+
+// Lecture complète : les machines en portée, l'onglet Résumé et la liste de
+// suivi interne. Un seul fichier peut décrire plusieurs affaires.
+function vbFtAnalyserClasseur(XLSX, wb) {
+  const onglets = vbFtOngletsMachines(XLSX, wb);
+  const machines = onglets.filter(o => o.retenu).map(o => {
+    const ws = wb.Sheets[o.nom];
+    const { lignes, aDefinir } = vbFtLignesFeuille(XLSX, ws);
+    return {
+      onglet: o.nom,
+      entete: {
+        type_machine: vbFtValeurBrute(ws, 'D2'),
+        modele:       vbFtValeurBrute(ws, 'F5'),
+        client:       vbFtValeurBrute(ws, 'I2'),
+        num_affaire:  vbFtValeurBrute(ws, 'N2'),
+        pays_ville:   vbFtValeurBrute(ws, 'J5'),
+        indice_ft:    vbFtValeurBrute(ws, 'O5')
+      },
+      lignes, aDefinir
+    };
+  });
+  const nomResume = wb.SheetNames.find(n => /^r[ée]sum[ée]/i.test(n.trim()));
+  const nomSuivi  = wb.SheetNames.find(n => /action item/i.test(n));
+  return {
+    machines,
+    onglets,
+    resume: nomResume ? vbFtLignesFeuille(XLSX, wb.Sheets[nomResume], { maxCol: 12, maxLignes: 60 }).lignes : null,
+    resume_onglet: nomResume || null,
+    suivi_onglet: nomSuivi || null
+  };
+}
+
+// ─── Champs recherchés dans une fiche technique ───
+// Le libellé sert à l'écran de confirmation, l'indice guide le modèle. Aucun de
+// ces champs n'est associé à une position : c'est tout l'objet de la réécriture.
+const VB_FT_CHAMPS = [
+  { cle:'client',            libelle:'Client',                 indice:"raison sociale du client" },
+  { cle:'num_affaire',       libelle:'N° d’affaire',           indice:"numéro d'affaire Vernet Behringer" },
+  { cle:'type_machine',      libelle:'Type de machine',        indice:"famille : HDX, HDL, HDV, HDS, VPX, grenailleuse…" },
+  { cle:'designation',       libelle:'Désignation',            indice:"modèle complet, ex. HBE 520/1026G 60°/60°" },
+  { cle:'ville',             libelle:'Ville',                  indice:"ville d'installation" },
+  { cle:'pays',              libelle:'Pays',                   indice:"pays d'installation" },
+  { cle:'metier_client',     libelle:'Métier du client',       indice:"activité principale" },
+  { cle:'langue_client',     libelle:'Langue du client',       indice:"langue de communication" },
+  { cle:'contact_tech',      libelle:'Contact technique',      indice:"nom du contact technique chez le client" },
+  { cle:'ingenieur_com',     libelle:'Ingénieur commercial',   indice:"IC Vernet Behringer" },
+  { cle:'charge_affaires',   libelle:'Chargé d’affaires',      indice:"CA Vernet Behringer" },
+  { cle:'delai_contractuel', libelle:'Délai contractuel',      indice:"date ou délai de livraison au contrat" },
+  { cle:'incoterm',          libelle:'Incoterm',               indice:"EXW, FCA, DAP, DDP, CIF, FRANCO…" },
+  { cle:'penalites',         libelle:'Pénalités de retard',    indice:"clause de pénalités" },
+  { cle:'tension',           libelle:'Tension',                indice:"tension d'alimentation, ex. 400V triphasé" },
+  { cle:'frequence',         libelle:'Fréquence',              indice:"fréquence réseau, ex. 50 Hz" },
+  { cle:'regime_neutre',     libelle:'Régime de neutre',       indice:"TT, TN-S, IT…" },
+  { cle:'nature_sol',        libelle:'Nature du sol',          indice:"béton, dallage…" },
+  { cle:'etat_sol',          libelle:'État du sol',            indice:"bon, moyen, à reprendre…" },
+  { cle:'temp_mini',         libelle:'Température mini',       indice:"température minimale de l'atelier" },
+  { cle:'temp_maxi',         libelle:'Température maxi',       indice:"température maximale de l'atelier" },
+  { cle:'moyen_transport',   libelle:'Moyen de transport',     indice:"camion, bateau…" },
+  { cle:'duree_formation',   libelle:'Durée de formation',     indice:"nombre de jours de formation" },
+  { cle:'nb_personnes_form', libelle:'Personnes à former',     indice:"effectif à former" },
+  { cle:'langue_formation',  libelle:'Langue de formation',    indice:"langue de la formation" },
+  { cle:'langue_docs',       libelle:'Langue de la doc',       indice:"langue de la documentation" },
+  { cle:'duree_garantie',    libelle:'Durée de garantie',      indice:"durée de garantie contractuelle" }
+];
+
+const VB_FT_SCHEMA = {
+  type: 'object',
+  properties: {
+    champs: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          cle:     { type: 'string' },
+          valeur:  { type: 'string' },
+          cellule: { type: 'string' },
+          libelle_source: { type: 'string' },
+          etat:    { type: 'string', enum: ['renseigne', 'a_definir'] }
+        },
+        required: ['cle', 'valeur', 'cellule', 'etat']
+      }
+    }
+  },
+  required: ['champs']
+};
+
+function vbFtPrompt(machine) {
+  return 'Tu lis une fiche technique Vernet Behringer rendue ligne par ligne. Chaque valeur est\n'
+    + 'précédée de sa référence de cellule entre crochets.\n\n'
+    + 'Règles impératives :\n'
+    + '- Ne retiens une valeur que si un libellé de la MÊME LIGNE (ou juste au-dessus) la justifie.\n'
+    + '- Ne déduis JAMAIS une valeur de sa position : les lignes changent d\'un modèle de machine à l\'autre.\n'
+    + '- « cellule » doit être la référence exacte d\'où vient la valeur, telle qu\'écrite entre crochets.\n'
+    + '- « libelle_source » est le libellé qui t\'a fait retenir cette valeur, recopié tel quel.\n'
+    + '- Si la valeur est « à définir », « ? », « à confirmer » : etat = "a_definir" et recopie ce texte.\n'
+    + '- Si un champ est absent de la fiche, NE L\'INCLUS PAS. Ne devine pas, n\'invente pas.\n'
+    + '- Une case notée « non tranché » n\'est PAS une réponse : ignore-la.\n\n'
+    + 'Champs recherchés :\n'
+    + VB_FT_CHAMPS.map(c => '- ' + c.cle + ' : ' + c.indice).join('\n')
+    + '\n\nOnglet « ' + machine.onglet + ' » :\n' + machine.lignes.join('\n');
+}
+
+// Garde-fou contre l'invention : toute valeur doit se retrouver dans la cellule
+// citée. Le modèle désigne, il ne crée pas. Une valeur qui ne se vérifie pas
+// n'est pas jetée en silence — elle est signalée comme telle à l'écran.
+function vbFtNormaliser(t) {
+  return String(t || '').toLowerCase().replace(/[\s ]+/g, ' ')
+    .replace(/[«»"'’,;:()]/g, '').trim();
+}
+
+function vbFtVerifier(XLSX, ws, champs) {
+  return (champs || []).map(c => {
+    const def = VB_FT_CHAMPS.find(d => d.cle === c.cle);
+    const brut = vbFtTexteCellule(ws[c.cellule]);
+    const a = vbFtNormaliser(c.valeur), b = vbFtNormaliser(brut);
+    let controle = 'absente';
+    if (b) {
+      if (a === b) controle = 'exacte';
+      else if (b.includes(a) || a.includes(b)) controle = 'extraite';
+      else controle = 'divergente';
+    }
+    return {
+      cle: c.cle,
+      libelle: def ? def.libelle : c.cle,
+      valeur: c.valeur,
+      cellule: c.cellule,
+      libelle_source: c.libelle_source || '',
+      etat: c.etat === 'a_definir' ? 'a_definir' : 'renseigne',
+      contenu_cellule: brut,
+      controle,                       // exacte | extraite | divergente | absente
+      fiable: controle === 'exacte' || controle === 'extraite',
+      connu: !!def
+    };
+  });
+}
+
+async function vbFtExtraireMachine(XLSX, wb, machine) {
+  const rep = await vbGeminiCall({ prompt: vbFtPrompt(machine), schema: VB_FT_SCHEMA });
+  const champs = vbFtVerifier(XLSX, wb.Sheets[machine.onglet], rep && rep.champs);
+  return {
+    onglet: machine.onglet,
+    entete: machine.entete,
+    champs,
+    retenus: champs.filter(c => c.fiable && c.etat === 'renseigne' && c.connu),
+    a_definir: champs.filter(c => c.etat === 'a_definir'),
+    rejetes: champs.filter(c => !c.fiable || !c.connu),
+    a_definir_feuille: machine.aDefinir
+  };
+}
+
+// ─── Onglet « Résumé » : commercial, échéancier et jalons ───
+// Les cellules y dérivent aussi d'un fichier à l'autre, même entre deux fiches du
+// même auteur : date de contrat en C5 (Dexis) contre B5 (Otavske). Même méthode.
+const VB_FT_RESUME_SCHEMA = {
+  type: 'object',
+  properties: {
+    num_affaire:    { type: 'string' },
+    incoterm:       { type: 'string' },
+    contrat_signe:  { type: 'string' },
+    date_passation: { type: 'string' },
+    delai:          { type: 'string' },
+    objet:          { type: 'string' },
+    echeancier: { type: 'array', items: { type: 'object', properties: {
+      libelle: { type:'string' }, pourcentage: { type:'string' }, date: { type:'string' }, cellule: { type:'string' }
+    }, required: ['libelle','cellule'] } },
+    jalons: { type: 'array', items: { type: 'object', properties: {
+      libelle: { type:'string' }, date: { type:'string' }, semaine: { type:'string' }, cellule: { type:'string' }
+    }, required: ['libelle','cellule'] } }
+  }
+};
+
+function vbFtPromptResume(lignes) {
+  return 'Tu lis l\'onglet « Résumé » d\'une fiche technique Vernet Behringer, rendu ligne par ligne,\n'
+    + 'chaque valeur précédée de sa référence de cellule entre crochets.\n\n'
+    + 'Règles impératives :\n'
+    + '- Ne retiens une valeur que si un libellé voisin la justifie. Ne déduis rien d\'une position.\n'
+    + '- « cellule » = la référence exacte d\'où vient la valeur.\n'
+    + '- Les dates au format AAAA-MM-JJ. Si une échéance est exprimée en numéro de semaine,\n'
+    + '  mets ce nombre dans « semaine » et laisse « date » vide. Ne la convertis PAS toi-même.\n'
+    + '- N\'invente aucune date. Un champ absent est simplement omis.\n\n'
+    + 'Cherche : le n° d\'affaire, l\'incoterm, la date de contrat signé, la date de passation,\n'
+    + 'le délai, l\'objet du projet, l\'échéancier de paiement (acompte, FAT, MES, SAT… avec\n'
+    + 'pourcentage et date si elle existe) et les jalons de planning.\n\n'
+    + 'Onglet Résumé :\n' + lignes.join('\n');
+}
+
+// Une date hors de cette fenêtre est une coquille, pas une donnée : l'une des
+// fiches porte une « date de fin » au 05/05/5818.
+function vbFtDateVraisemblable(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) return false;
+  const a = Number(String(iso).slice(0, 4));
+  return a >= 2015 && a <= 2045;
+}
+
+// Semaine N comptée depuis une origine : le fichier ne dit jamais laquelle, donc
+// on ne devine pas — l'origine est choisie à l'écran de confirmation.
+function vbFtDateDepuisSemaine(origineIso, n) {
+  const sem = Number(n);
+  if (!vbFtDateVraisemblable(origineIso) || !Number.isFinite(sem)) return null;
+  const d = new Date(origineIso + 'T12:00:00');
+  d.setDate(d.getDate() + sem * 7);
+  const iso = d.toISOString().slice(0, 10);
+  return typeof vbLundiSiWeekEnd === 'function' ? vbLundiSiWeekEnd(iso) : iso;
+}
+
+async function vbFtExtraireResume(XLSX, wb, analyse) {
+  if (!analyse.resume || !analyse.resume.length) return null;
+  const rep = await vbGeminiCall({ prompt: vbFtPromptResume(analyse.resume), schema: VB_FT_RESUME_SCHEMA });
+  const ws = wb.Sheets[analyse.resume_onglet];
+  const verif = (liste) => (liste || []).map(x => {
+    const brut = vbFtTexteCellule(ws[x.cellule]);
+    const douteuse = x.date && !vbFtDateVraisemblable(x.date);
+    return Object.assign({}, x, {
+      contenu_cellule: brut,
+      date: douteuse ? null : (x.date || null),
+      date_rejetee: douteuse ? x.date : null,
+      fiable: !!brut
+    });
+  });
+  return {
+    onglet: analyse.resume_onglet,
+    num_affaire: rep.num_affaire || null,
+    incoterm: rep.incoterm || null,
+    contrat_signe: vbFtDateVraisemblable(rep.contrat_signe) ? rep.contrat_signe : null,
+    date_passation: vbFtDateVraisemblable(rep.date_passation) ? rep.date_passation : null,
+    delai: rep.delai || null,
+    objet: rep.objet || null,
+    echeancier: verif(rep.echeancier),
+    jalons: verif(rep.jalons)
+  };
+}
+
+// ─── Fiche technique en PDF ───
+// Ces PDF sont des impressions d'Excel : l'extraction de texte entrelace les
+// colonnes et dissocie les libellés de leurs valeurs. Le fichier part donc
+// tel quel au modèle, qui lit la mise en page. En contrepartie il n'y a pas de
+// cellule à recontrôler : ces valeurs sont marquées comme non vérifiables.
+function vbFtFichierBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+    r.onerror = () => reject(new Error('Lecture du fichier impossible.'));
+    r.readAsDataURL(file);
+  });
+}
+
+async function vbFtExtrairePdf(file) {
+  const base64 = await vbFtFichierBase64(file);
+  const prompt = 'Tu lis une fiche technique Vernet Behringer au format PDF.\n\n'
+    + 'Règles : ne retiens une valeur que si son libellé la justifie dans la mise en page.\n'
+    + 'Si la valeur est « à définir » ou « ? », etat = "a_definir". N\'invente rien :\n'
+    + 'un champ absent est omis. Mets dans « cellule » le repère où tu l\'as lue\n'
+    + '(page et intitulé de section), et dans « libelle_source » le libellé exact.\n\n'
+    + 'Champs recherchés :\n' + VB_FT_CHAMPS.map(c => '- ' + c.cle + ' : ' + c.indice).join('\n');
+  const rep = await vbGeminiCall({ prompt, schema: VB_FT_SCHEMA,
+    fichiers: [{ mime: 'application/pdf', base64 }] });
+  const champs = (rep && rep.champs || []).map(c => {
+    const def = VB_FT_CHAMPS.find(d => d.cle === c.cle);
+    return {
+      cle: c.cle, libelle: def ? def.libelle : c.cle, valeur: c.valeur,
+      cellule: c.cellule || '', libelle_source: c.libelle_source || '',
+      etat: c.etat === 'a_definir' ? 'a_definir' : 'renseigne',
+      contenu_cellule: '', controle: 'pdf',
+      fiable: !!def, connu: !!def
+    };
+  });
+  // Un PDF n'a pas d'en-tête à position connue : on reconstitue celui-ci depuis
+  // les champs extraits, pour que la machine s'affiche et se nomme comme une autre.
+  const v = cle => (champs.find(c => c.cle === cle && c.etat === 'renseigne') || {}).valeur || null;
+  return {
+    onglet: file.name, source_pdf: true,
+    entete: { type_machine: v('type_machine'), modele: v('designation'),
+              client: v('client'), num_affaire: v('num_affaire') },
+    champs,
+    retenus: champs.filter(c => c.fiable && c.etat === 'renseigne'),
+    a_definir: champs.filter(c => c.etat === 'a_definir'),
+    rejetes: champs.filter(c => !c.connu),
+    a_definir_feuille: []
+  };
+}
+
+// ─── La fiche technique conservée dans le projet ───
+// Elle vit dans p.fiche_technique, part dans Drive comme le reste, reste
+// consultable après l'import, se modifie à la main et garde ses révisions.
+// Chaque champ sait d'où il vient : cellule d'origine, libellé qui l'a
+// justifié, et si la valeur a été reprise à la main depuis.
+
+function vbFtGet(p) { return (p && p.fiche_technique) || null; }
+
+function vbFtIndice(p) { const f = vbFtGet(p); return f ? (f.indice || 0) : 0; }
+
+// Archive l'état courant des champs avant toute modification, et incrémente
+// l'indice — même logique que snapshotAndIncrement pour le planning.
+function vbFtArchiver(p, commentaire) {
+  const f = vbFtGet(p);
+  if (!f) return;
+  f.historique = f.historique || [];
+  f.historique.push({
+    indice: f.indice || 0,
+    date: new Date().toISOString(),
+    auteur: (typeof vbCurrentUser !== 'undefined' && vbCurrentUser) ? vbCurrentUser.username : '',
+    commentaire: commentaire || '',
+    champs: JSON.parse(JSON.stringify(f.champs || []))
+  });
+  f.indice = (f.indice || 0) + 1;
+}
+
+function vbFtPoser(p, extraction, resume, source) {
+  const ancienne = vbFtGet(p);
+  if (ancienne) vbFtArchiver(p, 'Réimport depuis ' + (source || 'une fiche technique'));
+  const champs = (extraction.retenus || []).concat(extraction.a_definir || [])
+    .map(c => Object.assign({}, c, { origine: 'ft' }));
+  p.fiche_technique = {
+    source: source || '',
+    onglet: extraction.onglet || '',
+    source_pdf: !!extraction.source_pdf,
+    importe_le: new Date().toISOString(),
+    indice: ancienne ? ancienne.indice : 0,
+    entete: extraction.entete || {},
+    champs,
+    ecartes: extraction.rejetes || [],
+    a_definir_feuille: extraction.a_definir_feuille || [],
+    resume: resume || null,
+    historique: ancienne ? (ancienne.historique || []) : []
+  };
+  return p.fiche_technique;
+}
+
+// Modification manuelle d'un champ : archive, écrit, et marque l'origine pour
+// qu'un réimport ne l'efface pas sans qu'on le voie.
+function vbFtModifier(p, cle, valeur) {
+  const f = vbFtGet(p);
+  if (!f) return false;
+  const c = (f.champs || []).find(x => x.cle === cle);
+  const v = String(valeur == null ? '' : valeur).trim();
+  if (c && String(c.valeur || '') === v) return false;
+  vbFtArchiver(p, 'Modification manuelle : ' + ((c && c.libelle) || cle));
+  if (c) {
+    c.valeur = v;
+    c.origine = 'manuel';
+    c.etat = v ? 'renseigne' : 'a_definir';
+    c.controle = 'manuel';
+  } else {
+    const def = VB_FT_CHAMPS.find(d => d.cle === cle);
+    f.champs.push({ cle, libelle: def ? def.libelle : cle, valeur: v, cellule: '',
+      libelle_source: '', etat: v ? 'renseigne' : 'a_definir',
+      contenu_cellule: '', controle: 'manuel', fiable: true, connu: !!def, origine: 'manuel' });
+  }
+  return true;
+}
+
+const VB_FT_CONTROLE_LIB = {
+  exacte:     ['Vérifiée',       'var(--green-600,#16a34a)', 'la valeur correspond exactement au contenu de la cellule citée'],
+  extraite:   ['Vérifiée',       'var(--green-600,#16a34a)', 'la valeur a été extraite du contenu de la cellule citée'],
+  divergente: ['Non vérifiée',   'var(--red-600,#dc2626)',   'la cellule citée contient autre chose'],
+  absente:    ['Non vérifiée',   'var(--red-600,#dc2626)',   'la cellule citée est vide ou n’existe pas'],
+  pdf:        ['Non recoupée',   'var(--amber-700,#b45309)', 'lue dans un PDF : aucune cellule à recontrôler'],
+  manuel:     ['Saisie manuelle','var(--purple-600,#7c3aed)','valeur saisie à la main']
+};
+
+// ─── Affichage de la fiche technique dans le projet ───
+let vbFtRevisionVue = null;   // indice d'une révision consultée, null = version courante
+
+function vbFtBadgeControle(c) {
+  // Un champ « à définir » est fidèlement lu, mais ce n'est pas une valeur :
+  // le badger « Vérifiée » laissait croire que la donnée était acquise.
+  const d = c.etat === 'a_definir'
+    ? ['À définir', 'var(--amber-700,#b45309)', 'la fiche porte « à définir » à cet endroit : la valeur reste à obtenir']
+    : (VB_FT_CONTROLE_LIB[c.controle] || ['—', 'var(--text3)', '']);
+  return '<span title="' + vbEsc(d[2]) + '" style="font-size:10px;font-weight:600;color:' + d[1] + '">' + vbEsc(d[0]) + '</span>';
+}
+
+function vbFtOrigineTexte(c) {
+  if (c.origine === 'manuel') return 'saisie manuelle';
+  const bouts = [];
+  if (c.libelle_source) bouts.push('« ' + c.libelle_source + ' »');
+  if (c.cellule) bouts.push(c.controle === 'pdf' ? c.cellule : 'cellule ' + c.cellule);
+  return bouts.join(' · ') || '—';
+}
+
+function vbFtRenderTab(p) {
+  const el = document.getElementById('detail-ft');
+  if (!el) return;
+  const f = vbFtGet(p);
+  if (!f) {
+    el.innerHTML = '<div style="padding:28px;text-align:center;color:var(--text3);font-size:13px">'
+      + 'Aucune fiche technique importée pour cette affaire.<br><br>'
+      + '<button class="btn btn-primary" onclick="vbFtOuvrirImport(' + p.id + ')">⬆ Importer une fiche technique</button>'
+      + '</div>';
+    return;
+  }
+  const histo = f.historique || [];
+  const vue = vbFtRevisionVue !== null ? histo.find(h => h.indice === vbFtRevisionVue) : null;
+  const champs = vue ? vue.champs : (f.champs || []);
+  const lecture = !!vue;
+
+  const lignes = champs.map(c => {
+    const vide = !c.valeur || c.etat === 'a_definir';
+    return '<tr style="border-bottom:0.5px solid var(--border)">'
+      + '<td style="padding:7px 8px;color:var(--text2);font-size:12px;white-space:nowrap">' + vbEsc(c.libelle) + '</td>'
+      + '<td style="padding:5px 8px">'
+      + (lecture
+          ? '<span style="font-size:13px">' + vbEsc(c.valeur || '—') + '</span>'
+          : '<input class="form-input" style="font-size:13px;padding:4px 7px;width:100%'
+            + (vide ? ';background:var(--amber-50,#fffbeb)' : '') + '" value="' + vbEsc(c.valeur || '')
+            + '" onchange="vbFtSaisir(' + p.id + ',\'' + c.cle + '\',this.value)">')
+      + (vide ? '<div style="font-size:10px;color:var(--amber-700,#b45309);margin-top:2px">à définir dans la fiche</div>' : '')
+      + '</td>'
+      + '<td style="padding:7px 8px;font-size:11px;color:var(--text3)">' + vbEsc(vbFtOrigineTexte(c)) + '</td>'
+      + '<td style="padding:7px 8px;text-align:right">' + vbFtBadgeControle(c) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  const ecartes = (f.ecartes || []).filter(c => c.connu);
+  const blocEcartes = ecartes.length ? '<details style="margin-top:14px"><summary style="cursor:pointer;font-size:12px;color:var(--red-600,#dc2626);font-weight:600">'
+    + ecartes.length + ' valeur(s) proposée(s) mais non retenue(s)</summary>'
+    + '<div style="font-size:11px;color:var(--text2);margin:8px 0 6px">Le contrôle les a écartées : elles ne correspondent pas à la cellule citée. Rien n\'a été importé.</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+    + ecartes.map(c => '<tr style="border-bottom:0.5px solid var(--border)">'
+        + '<td style="padding:5px 8px;color:var(--text2)">' + vbEsc(c.libelle) + '</td>'
+        + '<td style="padding:5px 8px">proposé : « ' + vbEsc(c.valeur) + ' »</td>'
+        + '<td style="padding:5px 8px;color:var(--text3)">' + vbEsc(c.cellule) + ' contient : '
+        + (c.contenu_cellule ? '« ' + vbEsc(c.contenu_cellule) + ' »' : 'rien') + '</td></tr>').join('')
+    + '</table></details>' : '';
+
+  const r = f.resume;
+  const blocResume = !r ? '' : '<div style="margin-top:16px;border-top:0.5px solid var(--border);padding-top:14px">'
+    + '<div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">Onglet « ' + vbEsc(r.onglet || 'Résumé') + ' »</div>'
+    + (r.echeancier && r.echeancier.length ? '<div style="font-size:12px;margin-bottom:8px"><b>Échéancier :</b> '
+        + r.echeancier.map(e => vbEsc(e.libelle) + (e.pourcentage ? ' ' + vbEsc(e.pourcentage) : '') + (e.date ? ' au ' + e.date : '')).join(' · ') + '</div>' : '')
+    + (r.jalons && r.jalons.length ? '<div style="font-size:12px"><b>Jalons :</b> '
+        + r.jalons.map(j => vbEsc(j.libelle) + (j.date ? ' au ' + j.date : (j.semaine ? ' — semaine ' + vbEsc(j.semaine) : ''))).join(' · ') + '</div>' : '')
+    + '</div>';
+
+  const blocHisto = !histo.length ? '' : '<details style="margin-top:14px"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--text2)">'
+    + 'Révisions (' + histo.length + ')</summary><div style="margin-top:8px">'
+    + histo.slice().reverse().map(h => '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:0.5px solid var(--border);font-size:12px">'
+        + '<span class="indice-badge">Ind. ' + h.indice + '</span>'
+        + '<span style="flex:1;color:var(--text2)">' + vbEsc(h.commentaire || '—') + '</span>'
+        + '<span style="color:var(--text3);font-size:11px">' + new Date(h.date).toLocaleString('fr-FR') + '</span>'
+        + '<button class="btn btn-sm" onclick="vbFtVoirRevision(' + p.id + ',' + h.indice + ')">Voir</button>'
+        + '<button class="btn btn-sm" onclick="vbFtRestaurerRevision(' + p.id + ',' + h.indice + ')">Restaurer</button>'
+        + '</div>').join('') + '</div></details>';
+
+  el.innerHTML =
+    (lecture ? '<div style="background:var(--amber-50,#fffbeb);border:0.5px solid var(--amber-200,#fde68a);border-radius:6px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--amber-800,#92400e);display:flex;align-items:center;gap:10px">'
+        + '<span>Vous consultez la révision <b>Ind. ' + vue.indice + '</b> — lecture seule.</span>'
+        + '<button class="btn btn-sm" style="margin-left:auto" onclick="vbFtVoirRevision(' + p.id + ',null)">Revenir à la version courante</button></div>' : '')
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
+    + '<span class="indice-badge">Ind. ' + (f.indice || 0) + '</span>'
+    + '<span style="font-size:12px;color:var(--text2)">' + vbEsc(f.source || 'fiche importée')
+    + (f.onglet && !f.source_pdf ? ' · onglet « ' + vbEsc(f.onglet) + ' »' : '') + '</span>'
+    + '<span style="font-size:11px;color:var(--text3)">importée le ' + new Date(f.importe_le).toLocaleDateString('fr-FR') + '</span>'
+    + '<button class="btn btn-sm" style="margin-left:auto" onclick="vbFtOuvrirImport(' + p.id + ')">⬆ Réimporter</button>'
+    + '</div>'
+    + (f.a_definir_feuille && f.a_definir_feuille.length
+        ? '<div style="font-size:12px;color:var(--amber-800,#92400e);background:var(--amber-50,#fffbeb);border-radius:6px;padding:8px 11px;margin-bottom:12px">'
+          + f.a_definir_feuille.length + ' mention(s) « à définir » relevée(s) dans la fiche d\'origine.</div>' : '')
+    + '<table style="width:100%;border-collapse:collapse">'
+    + '<thead><tr style="border-bottom:0.5px solid var(--border2)">'
+    + '<th style="text-align:left;padding:5px 8px;font-size:10px;color:var(--text3);font-weight:600">CHAMP</th>'
+    + '<th style="text-align:left;padding:5px 8px;font-size:10px;color:var(--text3);font-weight:600">VALEUR</th>'
+    + '<th style="text-align:left;padding:5px 8px;font-size:10px;color:var(--text3);font-weight:600">PROVENANCE</th>'
+    + '<th style="text-align:right;padding:5px 8px;font-size:10px;color:var(--text3);font-weight:600">CONTRÔLE</th>'
+    + '</tr></thead><tbody>' + lignes + '</tbody></table>'
+    + blocResume + blocEcartes + blocHisto;
+}
+
+function vbFtSaisir(id, cle, valeur) {
+  const p = projects.find(x => x.id === id);
+  if (!p) return;
+  if (vbFtModifier(p, cle, valeur)) {
+    save();
+    vbFtRenderTab(p);
+    showNotification('✅ Fiche technique mise à jour — Ind. ' + vbFtIndice(p));
+  }
+}
+
+function vbFtVoirRevision(id, indice) {
+  vbFtRevisionVue = indice;
+  const p = projects.find(x => x.id === id);
+  if (p) vbFtRenderTab(p);
+}
+
+function vbFtRestaurerRevision(id, indice) {
+  const p = projects.find(x => x.id === id);
+  const f = vbFtGet(p);
+  if (!f) return;
+  const h = (f.historique || []).find(x => x.indice === indice);
+  if (!h) return;
+  if (!confirm('Restaurer la fiche technique dans son état Ind. ' + indice + ' ?\n\nL\'état actuel sera archivé comme révision, rien n\'est perdu.')) return;
+  vbFtArchiver(p, 'Avant restauration de l\'Ind. ' + indice);
+  f.champs = JSON.parse(JSON.stringify(h.champs || []));
+  vbFtRevisionVue = null;
+  save();
+  vbFtRenderTab(p);
+  showNotification('✅ Révision Ind. ' + indice + ' restaurée — nouvel Ind. ' + vbFtIndice(p));
+}
+
+// ─── Import d'une fiche technique : analyse, confirmation, écriture ───
+// Rien n'entre dans un projet avant validation à l'écran, et un même fichier
+// peut alimenter plusieurs affaires (la trame commerciale décrit 3 machines).
+let vbFtImport = null;   // état de l'import en cours
+
+function vbFtOuvrirImport(projetId) {
+  vbFtImport = { projetId: projetId || null, machines: [], resume: null, source: '' };
+  openModal('Importer une fiche technique',
+    '<div style="font-size:13px;color:var(--text2);margin-bottom:12px">'
+    + 'Fichier Excel (.xlsx) ou PDF. Les machines sont détectées automatiquement — '
+    + 'un fichier peut décrire plusieurs affaires.</div>'
+    + '<input type="file" id="vb-ft-fichier" accept=".xlsx,.xlsm,.xls,.pdf" class="form-input" style="margin-bottom:10px">'
+    + '<div id="vb-ft-etat" style="font-size:12px;min-height:22px;color:var(--text2)"></div>',
+    [ { label: 'Analyser', primary: true, action: vbFtLancerAnalyse },
+      { label: 'Annuler', action: closeModal } ]);
+}
+
+function vbFtEtat(txt, couleur) {
+  const el = document.getElementById('vb-ft-etat');
+  if (el) { el.innerHTML = txt; el.style.color = couleur || 'var(--text2)'; }
+}
+
+async function vbFtLancerAnalyse() {
+  const file = document.getElementById('vb-ft-fichier')?.files?.[0];
+  if (!file) { vbFtEtat('⚠ Sélectionnez un fichier.', 'var(--amber-700,#b45309)'); return; }
+  vbFtImport.source = file.name;
+  try {
+    if (/\.pdf$/i.test(file.name)) {
+      vbFtEtat('⏳ Lecture du PDF par l’assistant…');
+      vbFtImport.machines = [await vbFtExtrairePdf(file)];
+      return vbFtEcranConfirmation();
+    }
+    vbFtEtat('⏳ Ouverture du classeur…');
+    const XLSX = await loadXLSX();
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+    const analyse = vbFtAnalyserClasseur(XLSX, wb);
+    if (!analyse.machines.length) {
+      vbFtEtat('✗ Aucun onglet de fiche technique reconnu dans ce fichier.', 'var(--red-600,#dc2626)');
+      return;
+    }
+    const extraites = [];
+    for (let i = 0; i < analyse.machines.length; i++) {
+      const m = analyse.machines[i];
+      vbFtEtat('⏳ Lecture de « ' + vbEsc(m.onglet.trim()) + ' » ('
+        + (i + 1) + '/' + analyse.machines.length + ')…');
+      extraites.push(await vbFtExtraireMachine(XLSX, wb, m));
+    }
+    if (analyse.resume) {
+      vbFtEtat('⏳ Lecture de l’onglet « ' + vbEsc(analyse.resume_onglet) + ' »…');
+      try { vbFtImport.resume = await vbFtExtraireResume(XLSX, wb, analyse); }
+      catch (e) { console.warn('Résumé illisible', e); }
+    }
+    vbFtImport.machines = extraites;
+    vbFtImport.suivi_onglet = analyse.suivi_onglet;
+    vbFtEcranConfirmation();
+  } catch (e) {
+    vbFtEtat('✗ ' + vbEsc(e.message), 'var(--red-600,#dc2626)');
+  }
+}
+
+function vbFtOptionsProjets(sel) {
+  return '<option value="">— Créer une nouvelle affaire —</option>'
+    + projects.map(p => '<option value="' + p.id + '"' + (String(sel) === String(p.id) ? ' selected' : '') + '>'
+        + vbEsc(p.name) + '</option>').join('');
+}
+
+function vbFtEcranConfirmation() {
+  const r = vbFtImport.resume;
+  const semaines = r ? (r.jalons || []).filter(j => j.semaine && !j.date) : [];
+  const origines = [];
+  if (r && r.contrat_signe)  origines.push(['contrat', r.contrat_signe,  'contrat signé le ' + r.contrat_signe]);
+  if (r && r.date_passation) origines.push(['passation', r.date_passation, 'passation du ' + r.date_passation]);
+
+  const cartes = vbFtImport.machines.map((m, i) => {
+    const e = m.entete || {};
+    const titre = [e.type_machine, e.modele].filter(Boolean).join(' — ') || m.onglet;
+    const preselection = vbFtImport.projetId || '';
+    return '<div style="border:0.5px solid var(--border2);border-radius:8px;padding:14px;margin-bottom:12px">'
+      + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">'
+      + '<label style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;cursor:pointer">'
+      + '<input type="checkbox" id="vb-ft-ok-' + i + '" checked> ' + vbEsc(titre) + '</label>'
+      + '<span style="font-size:11px;color:var(--text3)">'
+      + (m.source_pdf
+          ? (titre === m.onglet ? 'PDF' : 'PDF · ' + vbEsc(m.onglet))
+          : 'onglet « ' + vbEsc(m.onglet.trim()) + ' »')
+      + '</span>'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px">'
+      + '<span style="color:var(--text2)">Destination :</span>'
+      + '<select id="vb-ft-dest-' + i + '" class="form-input" style="font-size:12px;padding:4px 7px;flex:1">'
+      + vbFtOptionsProjets(preselection) + '</select></div>'
+      + '<div style="font-size:12px;color:var(--text2);margin-bottom:6px">'
+      + '<b>' + m.retenus.length + '</b> champ(s) vérifié(s)'
+      + (m.a_definir.length ? ' · <b>' + m.a_definir.length + '</b> à définir' : '')
+      + (m.rejetes.filter(c => c.connu).length ? ' · <span style="color:var(--red-600,#dc2626)"><b>'
+          + m.rejetes.filter(c => c.connu).length + '</b> écarté(s) par le contrôle</span>' : '')
+      + '</div>'
+      + '<div style="max-height:190px;overflow:auto;border:0.5px solid var(--border);border-radius:6px">'
+      + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+      + m.retenus.concat(m.a_definir).map(c => '<tr style="border-bottom:0.5px solid var(--border)">'
+          + '<td style="padding:4px 8px;color:var(--text2);white-space:nowrap">' + vbEsc(c.libelle) + '</td>'
+          + '<td style="padding:4px 8px">' + vbEsc(c.valeur || '—') + '</td>'
+          + '<td style="padding:4px 8px;color:var(--text3);font-size:10px;white-space:nowrap">' + vbEsc(c.cellule) + '</td>'
+          + '<td style="padding:4px 8px;text-align:right">' + vbFtBadgeControle(c) + '</td></tr>').join('')
+      + '</table></div>'
+      + (m.rejetes.filter(x => x.connu).length
+          ? '<details style="margin-top:8px"><summary style="cursor:pointer;font-size:11px;font-weight:600;color:var(--red-600,#dc2626)">'
+            + 'Voir les valeurs écartées par le contrôle</summary>'
+            + '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:6px">'
+            + m.rejetes.filter(x => x.connu).map(x => '<tr style="border-bottom:0.5px solid var(--border)">'
+                + '<td style="padding:4px 8px;color:var(--text2)">' + vbEsc(x.libelle) + '</td>'
+                + '<td style="padding:4px 8px">proposé : « ' + vbEsc(x.valeur) + ' »</td>'
+                + '<td style="padding:4px 8px;color:var(--text3)">' + vbEsc(x.cellule) + ' contient '
+                + (x.contenu_cellule ? '« ' + vbEsc(x.contenu_cellule) + ' »' : 'rien') + '</td></tr>').join('')
+            + '</table></details>'
+          : '')
+      + '</div>';
+  }).join('');
+
+  const blocSemaines = !semaines.length ? '' :
+    '<div style="border:0.5px solid var(--amber-200,#fde68a);background:var(--amber-50,#fffbeb);border-radius:8px;padding:12px;margin-bottom:12px">'
+    + '<div style="font-size:12px;font-weight:600;color:var(--amber-800,#92400e);margin-bottom:6px">Jalons exprimés en numéro de semaine</div>'
+    + '<div style="font-size:12px;color:var(--amber-800,#92400e);margin-bottom:8px">'
+    + 'Le fichier ne dit pas depuis quelle date ces semaines sont comptées. Choisissez l’origine — '
+    + 'rien ne sera converti sans elle.</div>'
+    + '<select id="vb-ft-origine" class="form-input" style="font-size:12px;padding:4px 7px;margin-bottom:8px" onchange="vbFtRecalculerSemaines()">'
+    + '<option value="">— ne pas convertir —</option>'
+    + origines.map(o => '<option value="' + o[1] + '">Depuis le ' + o[2] + '</option>').join('')
+    + '</select>'
+    + '<div id="vb-ft-apercu-semaines" style="font-size:12px;color:var(--amber-800,#92400e)">'
+    + semaines.map(j => vbEsc(j.libelle) + ' — semaine ' + vbEsc(j.semaine)).join(' · ') + '</div></div>';
+
+  const blocSuivi = !vbFtImport.suivi_onglet ? '' :
+    '<div style="font-size:12px;color:var(--text2);background:var(--bg2,#faf9f6);border-radius:6px;padding:10px;margin-bottom:12px">'
+    + 'L’onglet « ' + vbEsc(vbFtImport.suivi_onglet) + ' » (suivi interne) n’est pas importé : '
+    + 'il contient souvent les notes d’un projet antérieur quand le fichier a été enregistré-sous. '
+    + 'Il reste à traiter séparément.</div>';
+
+  openModal('Fiche technique — ' + vbFtImport.machines.length + ' machine(s) détectée(s)',
+    blocSemaines + blocSuivi + cartes
+    + '<div style="font-size:11px;color:var(--text3);margin-top:4px">Rien n’est écrit avant votre validation.</div>',
+    [ { label: 'Appliquer', primary: true, action: vbFtAppliquerImport },
+      { label: 'Annuler', action: closeModal } ]);
+}
+
+function vbFtRecalculerSemaines() {
+  const origine = document.getElementById('vb-ft-origine')?.value || '';
+  const r = vbFtImport.resume;
+  const el = document.getElementById('vb-ft-apercu-semaines');
+  if (!r || !el) return;
+  el.innerHTML = (r.jalons || []).filter(j => j.semaine && !j.date).map(j => {
+    const d = origine ? vbFtDateDepuisSemaine(origine, j.semaine) : null;
+    return vbEsc(j.libelle) + ' — semaine ' + vbEsc(j.semaine) + (d ? ' → <b>' + d + '</b>' : '');
+  }).join(' · ');
+}
+
+function vbFtAppliquerImport() {
+  const origine = document.getElementById('vb-ft-origine')?.value || '';
+  const r = vbFtImport.resume;
+  if (r && origine) {
+    (r.jalons || []).forEach(j => {
+      if (j.semaine && !j.date) {
+        j.date = vbFtDateDepuisSemaine(origine, j.semaine);
+        j.origine_semaine = origine;
+      }
+    });
+  }
+  let crees = 0, completes = 0;
+  vbFtImport.machines.forEach((m, i) => {
+    if (!document.getElementById('vb-ft-ok-' + i)?.checked) return;
+    const dest = document.getElementById('vb-ft-dest-' + i)?.value || '';
+    let p = dest ? projects.find(x => String(x.id) === String(dest)) : null;
+    if (p) { completes++; }
+    else {
+      p = vbFtCreerProjet(m);
+      projects.push(p);
+      crees++;
+    }
+    vbFtPoser(p, m, r, vbFtImport.source);
+    vbFtAppliquerAuProjet(p, m, r);
+  });
+  save();
+  closeModal();
+  showNotification('✅ Fiche technique appliquée — ' + crees + ' affaire(s) créée(s), ' + completes + ' complétée(s)', 4000);
+  if (typeof showPage === 'function') showPage('projects');
+}
+
+function vbFtCreerProjet(m) {
+  const e = m.entete || {};
+  const champ = cle => (m.retenus.find(c => c.cle === cle) || {}).valeur || null;
+  const nom = [champ('client') || e.client, champ('type_machine') || e.type_machine, champ('designation') || e.modele]
+    .filter(Boolean).join(' - ') || ('Affaire importée — ' + (m.onglet || '').trim());
+  const maxId = projects.length ? Math.max(...projects.map(x => x.id)) : 0;
+  return {
+    id: maxId + 1, name: nom, status: 'etude',
+    tasks: [], journal: [], reserves: [], history: [], indice: 0,
+    fiche_liaison: null, type_projet: 'standard', type_machine: null,
+    chef_bem: '', chef_bea: '',
+    start_date: null, end_date: null
+  };
+}
+
+// Les champs du projet reprennent la fiche, sans jamais écraser une valeur
+// déjà saisie à la main : la fiche complète, elle ne remplace pas.
+function vbFtAppliquerAuProjet(p, m, r) {
+  const champ = cle => (m.retenus.find(c => c.cle === cle) || {}).valeur || null;
+  const poser = (prop, val) => { if (val && !p[prop]) p[prop] = val; };
+  poser('ingenieur_commercial', champ('ingenieur_com'));
+  poser('charge_affaires', champ('charge_affaires'));
+  poser('contact_tech', champ('contact_tech'));
+  poser('incoterm', champ('incoterm') || (r && r.incoterm));
+  poser('ref', champ('num_affaire') || (r && r.num_affaire) || (m.entete && m.entete.num_affaire));
+  poser('city', champ('ville'));
+  poser('country', champ('pays'));
+}
+
 const FT_CELL_MAP = {
   // Identité
   client:              { sheet: 'HDV - Auto', cell: 'I2' },
@@ -6242,11 +8231,11 @@ function vbBuildDemoBookings(){
 // ── MODE DÉMO / PRODUCTION ──
 // 'demo' : données fictives, éphémères (jamais persistées), pour présentation.
 // 'production' : vraies données Vernet Behringer, persistées en localStorage, aucune donnée fictive.
-const VB_MODE_KEY = 'vb_factory_mode';
-const VB_PROD_PROJECTS_KEY = 'vb_factory_production_projects';
-const VB_PROD_PROJECTS_BACKUP_KEY = 'vb_factory_production_projects_backup'; // copie miroir de secours
-const VB_PROD_RESOURCES_KEY = 'vb_factory_production_resources';
-const VB_PROD_BOOKINGS_KEY = 'vb_factory_production_bookings';
+const VB_MODE_KEY = 'vb_factory_mode' + VB_SUFFIXE;
+const VB_PROD_PROJECTS_KEY = 'vb_factory_production_projects' + VB_SUFFIXE;
+const VB_PROD_PROJECTS_BACKUP_KEY = 'vb_factory_production_projects_backup' + VB_SUFFIXE; // copie miroir de secours
+const VB_PROD_RESOURCES_KEY = 'vb_factory_production_resources' + VB_SUFFIXE;
+const VB_PROD_BOOKINGS_KEY = 'vb_factory_production_bookings' + VB_SUFFIXE;
 
 function vbGetMode(){
   return localStorage.getItem(VB_MODE_KEY) === 'demo' ? 'demo' : 'production'; // défaut : production
@@ -6373,25 +8362,110 @@ function vbSwitchMode(newMode){
   location.reload();
 }
 
+// Les deux modes expliqués au survol : ce qui est affiché, et surtout ce qui arrive
+// aux données. C'est cette info-bulle qui remplace la bannière jaune permanente.
+const VB_MODE_AIDE = {
+  demo: '<b>Mode Démo</b><br>Projets fictifs, pour présenter l\'application.<br><br>'
+      + 'Vos saisies ne sont <b>jamais</b> envoyées dans Google Drive et disparaissent au rechargement '
+      + 'de la page. Vos vraies données restent intactes.<br><br>'
+      + 'Idéal pour essayer une manipulation sans risque.',
+  production: '<b>Mode Production</b><br>Vos vraies affaires.<br><br>'
+      + 'Chaque modification part dans Google Drive en quelques secondes.<br><br>'
+      + 'Filets de sécurité : une sauvegarde automatique par jour (30 conservées), '
+      + 'un point de restauration créé avant chaque import ou remise à zéro, '
+      + 'et l\'historique de versions de Google Drive.',
+  bac: '<b>Bac à sable</b><br>La même application, sur un dossier Drive '
+      + '<b>VB-Factory-essai</b> séparé.<br><br>'
+      + 'Tout y est distinct : affaires, ressources, sauvegardes, réglages. Importez-y '
+      + 'une sauvegarde pour essayer sur vos vraies données — le dossier de production '
+      + 'ne peut pas bouger.<br><br>'
+      + 'S\'ouvre dans un nouvel onglet : les deux peuvent rester ouverts en même temps.'
+};
+
+function vbModeTipEl(){
+  let t = document.getElementById('vb-mode-tip');
+  if(!t){ t = document.createElement('div'); t.id = 'vb-mode-tip'; document.body.appendChild(t); }
+  return t;
+}
+// Positionnement en position:fixed calculé à la volée : la barre latérale est en
+// overflow:auto, une info-bulle en position:absolute y serait rognée.
+function vbModeTipShow(ancre, cle){
+  const t = vbModeTipEl();
+  t.innerHTML = VB_MODE_AIDE[cle] || '';
+  t.style.display = 'block';
+  const r = ancre.getBoundingClientRect();
+  const h = t.offsetHeight, w = t.offsetWidth;
+  let top = r.top - h - 8;
+  if(top < 8) top = Math.min(r.bottom + 8, window.innerHeight - h - 8); // pas de place au-dessus
+  let left = r.left + r.width / 2 - w / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+  t.style.top = top + 'px';
+  t.style.left = left + 'px';
+}
+function vbModeTipHide(){
+  const t = document.getElementById('vb-mode-tip');
+  if(t){ t.style.display = 'none'; t.dataset.pour = ''; t.dataset.epingle = ''; }
+}
+// Fermeture au départ du survol uniquement : une info-bulle ouverte volontairement
+// (clic ou appui) ne doit pas se refermer toute seule. C'est indispensable sur mobile,
+// où Chrome émet un mouseleave juste après le clic qu'il synthétise depuis le toucher.
+function vbModeTipHideSurvol(){
+  const t = document.getElementById('vb-mode-tip');
+  if(t && t.dataset.epingle !== '1') vbModeTipHide();
+}
+// Sur mobile il n'y a pas de survol, et un appui ne donne pas le focus à un <span> :
+// l'explication resterait inatteignable au doigt. L'appui l'ouvre donc explicitement.
+function vbModeTipToggle(ancre, cle){
+  const t = vbModeTipEl();
+  if(t.style.display === 'block' && t.dataset.pour === cle && t.dataset.epingle === '1'){ vbModeTipHide(); return; }
+  vbModeTipShow(ancre, cle);
+  t.dataset.pour = cle;
+  t.dataset.epingle = '1';
+}
+document.addEventListener('click', e => {
+  // Le « ? » du bac à sable ouvre la même info-bulle : sans lui dans ce test,
+  // le clic qui vient de l'ouvrir la refermait aussitôt.
+  if(!e.target.closest || !e.target.closest('.vb-mode-label, .vb-bac-aide')) vbModeTipHide();
+});
+
+function vbModePillHtml(isDemo){
+  const att = cle => 'onmouseenter="vbModeTipShow(this,\'' + cle + '\')" onmouseleave="vbModeTipHideSurvol()" '
+                   + 'onfocus="vbModeTipShow(this,\'' + cle + '\')" onblur="vbModeTipHideSurvol()" '
+                   + 'onclick="vbModeTipToggle(this,\'' + cle + '\')" tabindex="0" role="button"';
+  return '<div class="vb-mode-pill">'
+    + '<span class="vb-mode-label ' + (isDemo ? 'on-demo' : '') + '" ' + att('demo') + '>Démo</span>'
+    + '<button class="vb-mode-switch" onclick="vbSwitchMode(\'' + (isDemo ? 'production' : 'demo') + '\')"'
+    + ' title="Basculer de mode" aria-label="Basculer entre Démo et Production"'
+    + ' style="background:' + (isDemo ? '#d97706' : '#16a34a') + '">'
+    + '<span class="vb-mode-knob" style="left:' + (isDemo ? '2px' : '20px') + '"></span>'
+    + '</button>'
+    + '<span class="vb-mode-label ' + (isDemo ? '' : 'on-prod') + '" ' + att('production') + '>Production</span>'
+    + '</div>';
+}
+
+// L'accès au bac à sable vit sous le sélecteur de mode, pas enterré dans la page
+// Export : c'est le même geste — choisir dans quel monde on travaille.
+function vbModeBacHtml(){
+  const att = 'onmouseenter="vbModeTipShow(this,\'bac\')" onmouseleave="vbModeTipHideSurvol()" '
+            + 'onfocus="vbModeTipShow(this,\'bac\')" onblur="vbModeTipHideSurvol()" '
+            + 'onclick="vbModeTipToggle(this,\'bac\')" tabindex="0" role="button"';
+  if(VB_BAC_A_SABLE){
+    return '<a class="vb-bac-btn vb-bac-retour" href="./index.html">↩ Revenir à la production</a>';
+  }
+  return '<div class="vb-bac-ligne">'
+    + '<a class="vb-bac-btn" href="./index.html?bac-a-sable=1" target="_blank" rel="noopener">🧪 Bac à sable</a>'
+    + '<span class="vb-bac-aide" ' + att + '>?</span></div>';
+}
+
 function vbRenderModeBadge(){
-  const mode = vbGetMode();
-  const isDemo = mode==='demo';
-  // La bannière jaune n'a de sens qu'en démo : affichée en production elle annonçait un
-  // mode faux et recouvrait le titre de la barre latérale.
-  const banner = document.getElementById('vb-demo-banner');
-  if(banner) banner.style.display = isDemo ? 'flex' : 'none';
-  const el = document.createElement('div');
-  el.id = 'vb-mode-badge';
-  el.style.cssText = 'position:fixed;bottom:14px;left:14px;z-index:10001;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--border,#ddd);padding:6px 10px;border-radius:24px;font-size:11px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.12);font-family:-apple-system,BlinkMacSystemFont,sans-serif';
-  el.innerHTML = `
-    <span style="color:${isDemo?'#92400e':'#555'}">Démo</span>
-    <button id="vb-mode-toggle-switch" onclick="vbSwitchMode('${isDemo?'production':'demo'}')"
-      style="position:relative;width:38px;height:20px;border-radius:12px;border:none;cursor:pointer;padding:0;background:${isDemo?'#d97706':'#c7c7c7'};transition:background 0.15s">
-      <span style="position:absolute;top:2px;left:${isDemo?'20px':'2px'};width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);transition:left 0.15s"></span>
-    </button>
-    <span style="color:${!isDemo?'#166534':'#555'}">Production</span>
-  `;
-  document.body.appendChild(el);
+  const isDemo = vbGetMode() === 'demo';
+  const html = vbModePillHtml(isDemo) + vbModeBacHtml();
+  // Deux emplacements, un seul visible à la fois (CSS) : barre latérale et onglet « Plus ».
+  ['vb-mode-slot', 'vb-mode-slot-mobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = html;
+  });
+  vbModeTipHide();
 }
 
 async function vbInit() {
