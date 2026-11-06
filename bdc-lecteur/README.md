@@ -1,4 +1,20 @@
-# Déploiement BDC Lecteur v2
+# BDC Lecteur v2
+
+Lecture assistée par IA des bons de commande éditeurs (PDF) : extraction des titres,
+tri par catégorie / type, décision Oui / Non / Indécis, scoring par profil de libraire
+et export TSV de la sélection.
+
+👉 **Ouvrir l'application : [yoannstegle-crypto.github.io/vb-factotum/bdc-lecteur/](https://yoannstegle-crypto.github.io/vb-factotum/bdc-lecteur/)**
+
+## Contenu du dossier
+
+| Fichier | Rôle |
+|---|---|
+| `BDC_lecteur_v2.html` | L'application (fichier unique, sans build) |
+| `index.html` | Redirige vers `BDC_lecteur_v2.html` (URL courte) |
+| `README.md` | Ce document |
+
+## Hébergement
 
 L'application est hébergée dans le dossier `bdc-lecteur/` du dépôt `vb-factotum`,
 déjà publié par GitHub Pages. Aucun dépôt séparé n'est nécessaire.
