@@ -5,6 +5,13 @@ Outil de suivi des projets d'installation machine (Vernet Behringer).
 Application web **d'un seul fichier** (`index.html`) : aucun build, aucune dépendance à
 installer. Elle s'ouvre telle quelle dans un navigateur.
 
+## Autres applications du dépôt
+
+| Application | Dossier | Lien |
+|---|---|---|
+| BDC Lecteur v2 | [`bdc-lecteur/`](bdc-lecteur/) | [Ouvrir](https://yoannstegle-crypto.github.io/vb-factotum/bdc-lecteur/) |
+| Syndic L'Ancienne École | [`syndic-ancienne-ecole/`](syndic-ancienne-ecole/) | [Ouvrir](https://yoannstegle-crypto.github.io/vb-factotum/syndic-ancienne-ecole/) |
+
 ---
 
 ## Architecture
