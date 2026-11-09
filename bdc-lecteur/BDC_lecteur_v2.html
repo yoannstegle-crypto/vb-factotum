@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BDC Lecteur v2 — YSE Conseils</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f0f13; --bg2: #16161c; --bg3: #1e1e26; --bg4: #252530;
+  --border: #2a2a38; --border2: #353548;
+  --text: #e8e8f0; --muted: #8888a8; --dim: #55557a;
+  --accent: #7c6af7; --accent2: #c084fc;
+  --gold: #f4b942; --green: #4ade80; --red: #f87171; --orange: #fb923c; --teal: #22d3ee;
+  --radius: 10px; --radius-sm: 6px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; }
+button { cursor: pointer; font-family: inherit; }
+input, select, textarea { font-family: inherit; }
+
+/* ── SCREENS ── */
+.screen { display: none; }
+.screen.active { display: flex; flex-direction: column; min-height: 100vh; }
+
+/* ══════════════════════════════════════
+   SCREEN 1 : HOME — Grille projets
+══════════════════════════════════════ */
+.home-topbar {
+  background: var(--bg2); border-bottom: 1px solid var(--border);
+  padding: 16px 28px; display: flex; align-items: center; gap: 16px;
+}
+.home-topbar h1 { font-family: 'Playfair Display', serif; font-size: 1.1rem; flex: 1; }
+.home-topbar h1 span { color: var(--accent2); }
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border: none; color: #fff; border-radius: var(--radius-sm);
+  padding: 9px 18px; font-size: 0.82rem; font-weight: 600;
+  transition: opacity .2s;
+}
+.btn-primary:hover { opacity: .88; }
+.btn-secondary {
+  background: var(--bg3); border: 1px solid var(--border2); color: var(--text);
+  border-radius: var(--radius-sm); padding: 7px 14px; font-size: 0.8rem;
+  transition: border-color .2s;
+}
+.btn-secondary:hover { border-color: var(--muted); }
+
+.home-body { flex: 1; padding: 28px; }
+.home-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 60vh; gap: 16px; color: var(--muted); text-align: center;
+}
+.home-empty .big-icon { font-size: 3rem; opacity: .4; }
+.home-empty h2 { font-size: 1.1rem; color: var(--text); }
+.home-empty p { font-size: 0.85rem; max-width: 400px; line-height: 1.6; }
+
+.project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.project-tile {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; cursor: pointer;
+  transition: border-color .2s, transform .15s; position: relative;
+}
+.project-tile:hover { border-color: var(--muted); transform: translateY(-2px); }
+.project-tile .deadline-dot {
+  position: absolute; top: 16px; right: 16px;
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.dot-green { background: var(--green); }
+.dot-orange { background: var(--orange); }
+.dot-red { background: var(--red); animation: pulse .8s infinite; }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+.project-tile h3 { font-family: 'Playfair Display', serif; font-size: 0.95rem; margin-bottom: 6px; padding-right: 24px; }
+.project-tile .meta { font-size: 0.72rem; color: var(--muted); margin-bottom: 14px; }
+.project-tile .deadline-label { font-size: 0.72rem; margin-bottom: 10px; }
+.project-tile .progress-track { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.project-tile .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; }
+.project-tile .progress-text { font-size: 0.68rem; color: var(--dim); margin-top: 5px; }
+.tile-delete {
+  position: absolute; bottom: 12px; right: 14px;
+  background: none; border: none; color: var(--dim); font-size: 0.75rem; padding: 2px 5px;
+}
+.tile-delete:hover { color: var(--red); }
+
+/* ══════════════════════════════════════
+   MODAL : Nouveau projet
+══════════════════════════════════════ */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal {
+  background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius);
+  padding: 28px; width: min(480px, 94vw);
+}
+.modal h2 { font-family: 'Playfair Display', serif; font-size: 1.1rem; margin-bottom: 20px; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 6px; }
+.form-group input, .form-group select {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text); border-radius: var(--radius-sm); padding: 9px 12px;
+  font-size: 0.82rem; outline: none;
+}
+.form-group input:focus, .form-group select:focus { border-color: var(--accent); }
+.form-group input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1) opacity(.5); }
+.upload-zone {
+  border: 2px dashed var(--border2); border-radius: var(--radius-sm);
+  padding: 24px; text-align: center; cursor: pointer; transition: border-color .2s;
+  background: var(--bg3);
+}
+.upload-zone:hover, .upload-zone.drag { border-color: var(--accent); }
+.upload-zone p { font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
+.upload-zone .upload-icon { font-size: 1.8rem; }
+.upload-zone.has-file { border-color: var(--green); }
+.upload-zone.has-file .upload-icon::after { content: ' ✓'; font-size: 1rem; color: var(--green); }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+/* ══════════════════════════════════════
+   SCREEN 2 : Vue projet
+══════════════════════════════════════ */
+.project-topbar {
+  background: var(--bg2); border-bottom: 1px solid var(--border);
+  padding: 12px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.back-btn { background: none; border: none; color: var(--muted); font-size: 1rem; padding: 4px 8px; }
+.back-btn:hover { color: var(--text); }
+.project-title { font-family: 'Playfair Display', serif; font-size: 1rem; flex: 1; min-width: 150px; }
+.deadline-badge {
+  font-size: 0.72rem; padding: 4px 10px; border-radius: 20px; font-weight: 500;
+  display: flex; align-items: center; gap: 5px;
+}
+.deadline-badge.green { background: rgba(74,222,128,.12); color: var(--green); border: 1px solid rgba(74,222,128,.3); }
+.deadline-badge.orange { background: rgba(251,146,60,.12); color: var(--orange); border: 1px solid rgba(251,146,60,.3); }
+.deadline-badge.red { background: rgba(248,113,113,.15); color: var(--red); border: 1px solid rgba(248,113,113,.35); }
+.counter-badge {
+  font-size: 0.72rem; padding: 4px 10px; border-radius: 20px;
+  background: var(--bg3); border: 1px solid var(--border); color: var(--muted);
+}
+.counter-badge b { color: var(--text); }
+
+.project-layout { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+/* sidebar */
+.project-sidebar {
+  width: 260px; min-width: 260px; background: var(--bg2); border-right: 1px solid var(--border);
+  padding: 16px; display: flex; flex-direction: column; gap: 18px; overflow-y: auto;
+}
+.sdb-title { font-size: 0.63rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin-bottom: 8px; }
+.filter-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip {
+  padding: 4px 10px; border: 1px solid var(--border); background: var(--bg3);
+  color: var(--muted); border-radius: 20px; font-size: 0.7rem; cursor: pointer; transition: all .15s;
+}
+.chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.depth-row { display: flex; gap: 5px; }
+.depth-btn {
+  flex: 1; padding: 5px 0; border: 1px solid var(--border); background: var(--bg3);
+  color: var(--muted); border-radius: var(--radius-sm); font-size: 0.7rem; transition: all .15s;
+}
+.depth-btn.active { background: var(--bg4); border-color: var(--muted); color: var(--text); }
+
+/* API config sidebar */
+.api-tabs { display: flex; gap: 5px; margin-bottom: 8px; }
+.api-tab { flex: 1; padding: 5px 0; border: 1px solid var(--border); background: var(--bg3); color: var(--muted); border-radius: var(--radius-sm); font-size: 0.7rem; transition: all .2s; }
+.api-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.api-key-row { display: flex; gap: 5px; }
+.api-key-input { flex: 1; background: var(--bg3); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); padding: 7px 9px; font-size: 0.72rem; outline: none; }
+.api-key-input:focus { border-color: var(--accent); }
+.api-key-toggle { background: var(--bg3); border: 1px solid var(--border); color: var(--muted); border-radius: var(--radius-sm); padding: 6px 8px; font-size: 0.75rem; }
+.api-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); display: inline-block; margin-right: 5px; }
+.api-dot.ok { background: var(--green); }
+.api-dot.err { background: var(--red); }
+.api-status { font-size: 0.68rem; color: var(--dim); margin-top: 5px; display: flex; align-items: center; }
+
+.score-btn {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border: none; color: #fff; border-radius: var(--radius-sm);
+  padding: 9px 0; font-size: 0.78rem; font-weight: 600; width: 100%;
+}
+.score-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.export-btn {
+  background: var(--bg3); border: 1px solid var(--border2); color: var(--muted);
+  border-radius: var(--radius-sm); padding: 7px 0; font-size: 0.75rem; width: 100%;
+}
+.export-btn:hover { border-color: var(--muted); color: var(--text); }
+
+/* stats mini */
+.mini-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.mini-stat { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 6px; text-align: center; }
+.mini-stat .n { font-size: 1.1rem; font-weight: 600; }
+.mini-stat .l { font-size: 0.6rem; color: var(--dim); margin-top: 2px; }
+.n-oui { color: var(--green); }
+.n-non { color: var(--red); }
+.n-nd { color: var(--muted); }
+
+/* main book list */
+.project-main { flex: 1; overflow-y: auto; padding: 16px 20px; }
+.processing-banner {
+  background: var(--bg3); border: 1px solid var(--accent); border-radius: var(--radius-sm);
+  padding: 12px 16px; margin-bottom: 16px; font-size: 0.8rem; color: var(--muted);
+}
+.processing-banner b { color: var(--accent); }
+.prog-bar { height: 3px; background: var(--border); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.prog-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .3s; }
+
+/* ── BOOK CARD ── */
+.book-list { display: flex; flex-direction: column; gap: 10px; }
+.book-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px 16px; transition: border-color .15s;
+  display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start;
+}
+.book-card:hover { border-color: var(--border2); }
+
+/* decision column */
+.book-decision { display: flex; flex-direction: column; gap: 5px; padding-top: 2px; }
+.dec-btn {
+  width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border2);
+  background: var(--bg3); font-size: 0.8rem; display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.dec-btn:hover { border-color: var(--muted); }
+.dec-btn.active-oui { background: rgba(74,222,128,.2); border-color: var(--green); }
+.dec-btn.active-non { background: rgba(248,113,113,.18); border-color: var(--red); }
+.dec-btn.active-nd { background: rgba(136,136,168,.15); border-color: var(--muted); }
+
+/* book content */
+.book-content {}
+.book-header { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.type-badge {
+  font-size: 0.6rem; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 10px; white-space: nowrap; flex-shrink: 0; margin-top: 1px;
+}
+.badge-nouveau { background: rgba(124,106,247,.18); color: var(--accent); border: 1px solid rgba(124,106,247,.35); }
+.badge-reedition { background: rgba(244,185,66,.12); color: var(--gold); border: 1px solid rgba(244,185,66,.3); }
+.badge-catalogue { background: rgba(34,211,238,.08); color: var(--teal); border: 1px solid rgba(34,211,238,.25); }
+.badge-inconnu { background: var(--bg3); color: var(--dim); border: 1px solid var(--border); }
+.book-title { font-family: 'Playfair Display', serif; font-size: 0.92rem; line-height: 1.3; }
+.book-author { font-size: 0.75rem; color: var(--accent2); margin-bottom: 4px; }
+.book-meta { font-size: 0.7rem; color: var(--dim); display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.book-summary { font-size: 0.78rem; color: var(--muted); line-height: 1.55; }
+.book-embargo {
+  font-size: 0.75rem; color: var(--orange); font-style: italic;
+  background: rgba(251,146,60,.07); border: 1px solid rgba(251,146,60,.2);
+  border-radius: 5px; padding: 6px 10px; margin-top: 6px;
+}
+
+/* scores */
+.book-scores { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-direction: column; gap: 5px; }
+.score-row { display: flex; align-items: center; gap: 7px; }
+.score-av { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.58rem; font-weight: 700; color: #fff; flex-shrink: 0; }
+.score-name { font-size: 0.68rem; color: var(--dim); width: 72px; flex-shrink: 0; }
+.score-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.score-fill { height: 100%; border-radius: 2px; }
+.score-pct { font-size: 0.68rem; font-weight: 600; width: 30px; text-align: right; flex-shrink: 0; }
+.score-reason { font-size: 0.63rem; color: var(--dim); padding-left: 27px; line-height: 1.4; }
+
+/* source button */
+.book-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; padding-top: 2px; }
+.source-btn {
+  background: var(--bg3); border: 1px solid var(--border2); color: var(--dim);
+  border-radius: var(--radius-sm); padding: 5px 8px; font-size: 0.7rem;
+  display: flex; align-items: center; gap: 4px; white-space: nowrap;
+}
+.source-btn:hover { border-color: var(--muted); color: var(--text); }
+.isbn-label { font-size: 0.6rem; color: var(--dim); text-align: right; max-width: 110px; word-break: break-all; }
+
+/* ══════════════════════════════════════
+   MODAL SOURCE (pop-up ISBN)
+══════════════════════════════════════ */
+.source-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 300;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.source-modal.open { opacity: 1; pointer-events: all; }
+.source-panel {
+  background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius);
+  width: min(560px, 94vw); max-height: 80vh; overflow-y: auto;
+}
+.source-panel-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.source-panel-header h3 { font-family: 'Playfair Display', serif; font-size: 1rem; }
+.close-source-btn { background: none; border: none; color: var(--muted); font-size: 1.2rem; padding: 2px 8px; }
+.close-source-btn:hover { color: var(--text); }
+.source-panel-body { padding: 20px; }
+.source-cover { width: 90px; float: left; margin-right: 16px; border-radius: 4px; border: 1px solid var(--border); }
+.source-title { font-family: 'Playfair Display', serif; font-size: 0.95rem; margin-bottom: 4px; }
+.source-author { font-size: 0.78rem; color: var(--accent2); margin-bottom: 12px; }
+.source-desc { font-size: 0.78rem; color: var(--muted); line-height: 1.6; margin-bottom: 14px; clear: both; }
+.source-link-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.source-link {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 0.72rem;
+  background: var(--bg3); border: 1px solid var(--border2); color: var(--accent2);
+  border-radius: var(--radius-sm); padding: 6px 12px; text-decoration: none;
+}
+.source-link:hover { border-color: var(--accent); color: var(--accent); }
+.source-embargo {
+  background: rgba(251,146,60,.07); border: 1px solid rgba(251,146,60,.25);
+  border-radius: var(--radius-sm); padding: 16px; text-align: center;
+}
+.source-embargo .embargo-icon { font-size: 1.8rem; margin-bottom: 8px; }
+.source-embargo h4 { color: var(--orange); margin-bottom: 6px; font-size: 0.9rem; }
+.source-embargo p { font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
+.source-loading { text-align: center; padding: 24px; color: var(--muted); font-size: 0.82rem; }
+
+/* ══════════════════════════════════════
+   PROFILES MODAL
+══════════════════════════════════════ */
+.profiles-modal { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 250; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.profiles-modal.open { opacity: 1; pointer-events: all; }
+.profiles-panel { background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius); width: min(540px, 94vw); max-height: 85vh; overflow-y: auto; }
+.profiles-panel-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.profiles-panel-header h3 { font-family: 'Playfair Display', serif; font-size: 1rem; }
+.profiles-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.profile-item { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; }
+.profile-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.p-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; color: #fff; flex-shrink: 0; }
+.p-name { font-size: 0.85rem; font-weight: 500; flex: 1; }
+.p-toggle { background: none; border: 1px solid var(--border2); color: var(--muted); border-radius: 5px; padding: 3px 8px; font-size: 0.7rem; }
+.p-toggle:hover { border-color: var(--muted); color: var(--text); }
+.p-json-wrap { display: none; }
+.p-json-wrap.open { display: block; }
+.p-json-wrap textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); padding: 8px; font-size: 0.68rem; font-family: monospace; resize: vertical; min-height: 110px; outline: none; margin-bottom: 6px; }
+.p-json-wrap textarea:focus { border-color: var(--accent); }
+.p-save-btn { background: var(--accent); border: none; color: #fff; border-radius: 5px; padding: 5px 12px; font-size: 0.72rem; }
+.p-select-row { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--muted); }
+.p-select-row input { accent-color: var(--accent); }
+.add-profile-btn { background: var(--bg3); border: 1px dashed var(--border2); color: var(--muted); border-radius: var(--radius-sm); padding: 10px; font-size: 0.75rem; width: 100%; }
+.add-profile-btn:hover { border-color: var(--muted); color: var(--text); }
+
+/* scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════
+     SCREEN 1 : ACCUEIL
+══════════════════════════════════ -->
+<div id="screen-home" class="screen active">
+  <div class="home-topbar">
+    <h1>BDC <span>Lecteur</span> <small style="font-size:.7rem;color:var(--dim);font-family:Inter">v2</small></h1>
+    <button class="btn-primary" onclick="openNewProjectModal()">＋ Nouveau BDC</button>
+  </div>
+  <div class="home-body">
+    <div id="home-empty" class="home-empty">
+      <div class="big-icon">📚</div>
+      <h2>Aucun bon de commande</h2>
+      <p>Importez un PDF pour créer votre premier projet. Chaque bon de commande devient un projet autonome que vous retrouvez ici.</p>
+      <button class="btn-primary" onclick="openNewProjectModal()">＋ Importer un BDC</button>
+    </div>
+    <div id="project-grid" class="project-grid" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     SCREEN 2 : PROJET
+══════════════════════════════════ -->
+<div id="screen-project" class="screen">
+  <div class="project-topbar">
+    <button class="back-btn" onclick="goHome()" title="Retour">← </button>
+    <div class="project-title" id="project-title-bar">—</div>
+    <div class="deadline-badge green" id="deadline-badge">📅 —</div>
+    <div class="counter-badge"><b id="counter-imported">0</b> titres importés</div>
+  </div>
+
+  <div class="project-layout">
+    <!-- Sidebar -->
+    <aside class="project-sidebar">
+
+      <!-- Stats -->
+      <div>
+        <div class="sdb-title">Sélection</div>
+        <div class="mini-stats">
+          <div class="mini-stat"><div class="n n-oui" id="stat-oui">0</div><div class="l">Oui</div></div>
+          <div class="mini-stat"><div class="n n-non" id="stat-non">0</div><div class="l">Non</div></div>
+          <div class="mini-stat"><div class="n n-nd" id="stat-nd">0</div><div class="l">?</div></div>
+        </div>
+      </div>
+
+      <!-- Filtres cat -->
+      <div>
+        <div class="sdb-title">Catégorie</div>
+        <div class="filter-chips" id="cat-chips"></div>
+      </div>
+
+      <!-- Filtres type -->
+      <div>
+        <div class="sdb-title">Type</div>
+        <div class="filter-chips">
+          <button class="chip active" data-type="all" onclick="setTypeFilter('all',this)">Tout</button>
+          <button class="chip" data-type="nouveau" onclick="setTypeFilter('nouveau',this)">Nouveauté</button>
+          <button class="chip" data-type="reedition" onclick="setTypeFilter('reedition',this)">Réédition</button>
+          <button class="chip" data-type="catalogue" onclick="setTypeFilter('catalogue',this)">Catalogue</button>
+        </div>
+      </div>
+
+      <!-- Sélection filtre -->
+      <div>
+        <div class="sdb-title">Décision</div>
+        <div class="filter-chips">
+          <button class="chip active" data-dec="all" onclick="setDecFilter('all',this)">Tout</button>
+          <button class="chip" data-dec="oui" onclick="setDecFilter('oui',this)">✓ Oui</button>
+          <button class="chip" data-dec="non" onclick="setDecFilter('non',this)">✗ Non</button>
+          <button class="chip" data-dec="nd" onclick="setDecFilter('nd',this)">? Indécis</button>
+        </div>
+      </div>
+
+      <!-- Profondeur -->
+      <div>
+        <div class="sdb-title">Résumé</div>
+        <div class="depth-row">
+          <button class="depth-btn active" onclick="setDepth('court',this)">Court</button>
+          <button class="depth-btn" onclick="setDepth('moyen',this)">Moyen</button>
+          <button class="depth-btn" onclick="setDepth('long',this)">Long</button>
+        </div>
+      </div>
+
+      <!-- API — champs cachés pour garder la logique, affichage dans modal config uniquement -->
+      <input type="hidden" id="api-key">
+      <span id="api-dot" style="display:none"></span>
+      <span id="api-status-txt" style="display:none"></span>
+
+      <!-- Scoring -->
+      <div>
+        <div class="sdb-title">Profils libraires</div>
+        <button class="btn-secondary" style="width:100%;font-size:.75rem;margin-bottom:8px;" onclick="openProfilesModal()">⚙️ Gérer les profils</button>
+        <button class="score-btn" id="score-btn" onclick="computeScores()">✦ Calculer les scores</button>
+      </div>
+
+      <!-- Export -->
+      <div>
+        <button class="export-btn" onclick="exportSelection()">📥 Exporter la sélection</button>
+      </div>
+
+    </aside>
+
+    <!-- Main -->
+    <main class="project-main" id="project-main">
+      <div class="processing-banner" id="processing-banner" style="display:none;">
+        <b id="processing-text">Extraction en cours…</b>
+        <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+      </div>
+      <div class="book-list" id="book-list"></div>
+    </main>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     MODAL : Config API (1er démarrage)
+══════════════════════════════════ -->
+<div class="modal-overlay" id="setup-modal" style="z-index:300;">
+  <div class="modal">
+    <h2>⚙️ Configuration API</h2>
+    <p style="font-size:.8rem;color:var(--muted);margin-bottom:20px;line-height:1.6;">Pour extraire et analyser les bons de commande, l'application a besoin d'une clé API. Choisissez votre fournisseur et collez votre clé ci-dessous.</p>
+    <div class="form-group">
+      <label>Fournisseur</label>
+      <div class="api-tabs" style="margin-bottom:0;">
+        <button class="api-tab active" id="setup-tab-claude" onclick="setupSelectApi('claude')">◆ Claude (Anthropic)</button>
+        <button class="api-tab" id="setup-tab-gemini" onclick="setupSelectApi('gemini')">✦ Gemini (Google)</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label id="setup-key-label">Clé API Claude <small style="color:var(--dim)">(commence par sk-ant-)</small></label>
+      <div class="api-key-row">
+        <input class="api-key-input" type="password" id="setup-key-input" placeholder="Collez votre clé ici…" oninput="setupOnApiKey(this.value)" style="font-size:.82rem;padding:9px 12px;">
+        <button class="api-key-toggle" onclick="setupToggleVis()">👁</button>
+      </div>
+      <div class="api-status" style="margin-top:7px;font-size:.75rem;"><span class="api-dot" id="setup-dot"></span><span id="setup-status">Aucune clé saisie</span></div>
+    </div>
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px;">
+      <div style="font-size:.7rem;color:var(--dim);margin-bottom:6px;">🔒 Où trouver ma clé ?</div>
+      <div style="font-size:.72rem;color:var(--muted);line-height:1.6;" id="setup-help-text">
+        Claude : <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent2)">console.anthropic.com → API Keys</a><br>
+        La clé est utilisée uniquement dans votre navigateur, jamais transmise à un tiers.
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeSetupModal()" id="setup-skip-btn">Configurer plus tard</button>
+      <button class="btn-primary" onclick="saveSetupAndClose()" id="setup-save-btn">Enregistrer et continuer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     MODAL : Nouveau projet
+══════════════════════════════════ -->
+<div class="modal-overlay" id="new-project-modal">
+  <div class="modal">
+    <h2>📄 Nouveau bon de commande</h2>
+    <div class="form-group">
+      <label>Nom du projet <span style="color:var(--red)">*</span></label>
+      <input type="text" id="np-name" placeholder="ex: Flammarion AS26 — Livres Illustrés">
+    </div>
+    <div class="form-group">
+      <label>Date limite de commande <span style="color:var(--red)">*</span></label>
+      <input type="date" id="np-deadline">
+    </div>
+    <div class="form-group">
+      <label>Fichier PDF</label>
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('pdf-input').click()"
+           ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+        <div class="upload-icon" id="upload-icon">📁</div>
+        <p id="upload-label">Cliquez ou glissez le PDF ici</p>
+      </div>
+      <input type="file" id="pdf-input" accept=".pdf" style="display:none" onchange="handleFileSelect(this)">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeNewProjectModal()">Annuler</button>
+      <button class="btn-primary" onclick="createProject()">Créer le projet</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     MODAL SOURCE
+══════════════════════════════════ -->
+<div class="source-modal" id="source-modal">
+  <div class="source-panel">
+    <div class="source-panel-header">
+      <h3 id="source-modal-title">Fiche du livre</h3>
+      <button class="close-source-btn" onclick="closeSourceModal()">✕</button>
+    </div>
+    <div class="source-panel-body" id="source-modal-body">
+      <div class="source-loading">Recherche en cours…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     MODAL PROFILS
+══════════════════════════════════ -->
+<div class="profiles-modal" id="profiles-modal">
+  <div class="profiles-panel">
+    <div class="profiles-panel-header">
+      <h3>👤 Profils libraires</h3>
+      <button class="close-source-btn" onclick="closeProfilesModal()">✕</button>
+    </div>
+    <div class="profiles-body" id="profiles-body"></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let projects = JSON.parse(localStorage.getItem('bdc_projects') || '[]');
+let savedApiProvider = localStorage.getItem('bdc_api_provider') || 'claude';
+let savedApiKey = localStorage.getItem('bdc_api_key') || '';
+let currentProjectId = null;
+let apiProvider = savedApiProvider;
+let apiKey = savedApiKey;
+let catFilter = 'all';
+let typeFilter = 'all';
+let decFilter = 'all';
+let depthMode = 'court';
+let selectedPdfFile = null;
+let scores = {}; // isbn -> [{profileIdx, score, reason}]
+let computing = false;
+
+let profiles = JSON.parse(localStorage.getItem('bdc_profiles') || 'null') || [
+  { nom:"Yannick", couleur:"#7c6af7", selected:true,
+    gouts:{ genres_aimes:["Art contemporain","Photographie","Design"], themes_aimes:["Modernité","Abstraction"], anti_gouts:["Ésotérisme"], notes:"Profil exigeant, apprécie la recherche formelle et les approches conceptuelles." }},
+  { nom:"Sébastien", couleur:"#f4b942", selected:false,
+    gouts:{ genres_aimes:["Impressionnisme","Peinture française","Artisanat d'art"], themes_aimes:["Lumière","Paysage","Savoir-faire"], anti_gouts:["Art très conceptuel","Street art"], notes:"Profil classique, attaché à la tradition picturale française." }},
+  { nom:"Moi", couleur:"#22d3ee", selected:false,
+    gouts:{ genres_aimes:["Cuisine","Bien-être","Jardinage"], themes_aimes:["Nature","Traditions","Exploration"], anti_gouts:[], notes:"Profil grand public orienté livres pratiques et beaux livres accessibles." }}
+];
+
+function saveProfiles() { localStorage.setItem('bdc_profiles', JSON.stringify(profiles)); }
+function saveProjects() { localStorage.setItem('bdc_projects', JSON.stringify(projects)); }
+function getProject() { return projects.find(p => p.id === currentProjectId); }
+
+// ══════════════════════════════════════════
+// HOME
+// ══════════════════════════════════════════
+function renderHome() {
+  const grid = document.getElementById('project-grid');
+  const empty = document.getElementById('home-empty');
+  if (projects.length === 0) {
+    empty.style.display = 'flex'; grid.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none'; grid.style.display = 'grid';
+  grid.innerHTML = projects.map(p => {
+    const days = Math.ceil((new Date(p.deadline) - new Date()) / 86400000);
+    const dotClass = days > 7 ? 'dot-green' : days > 3 ? 'dot-orange' : 'dot-red';
+    const deadlineStr = new Date(p.deadline).toLocaleDateString('fr-FR', {day:'2-digit',month:'short',year:'numeric'});
+    const total = (p.books || []).length;
+    const oui = (p.books || []).filter(b=>b.decision==='oui').length;
+    const pct = total > 0 ? Math.round(oui/total*100) : 0;
+    const done = (p.books || []).filter(b=>b.decision && b.decision!=='nd').length;
+    return `<div class="project-tile" onclick="openProject('${p.id}')">
+      <div class="deadline-dot ${dotClass}"></div>
+      <h3>${p.name}</h3>
+      <div class="meta">${total} titres · ajouté le ${new Date(p.created).toLocaleDateString('fr-FR')}</div>
+      <div class="deadline-label" style="color:${days<=3?'var(--red)':days<=7?'var(--orange)':'var(--muted)'}">📅 Date limite : ${deadlineStr}</div>
+      <div class="progress-track"><div class="progress-fill" style="width:${total>0?Math.round(done/total*100):0}%"></div></div>
+      <div class="progress-text">${done}/${total} traités · ${oui} sélectionnés</div>
+      <button class="tile-delete" onclick="event.stopPropagation();deleteProject('${p.id}')">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function deleteProject(id) {
+  if (!confirm('Supprimer ce projet ?')) return;
+  projects = projects.filter(p=>p.id!==id);
+  saveProjects();
+  renderHome();
+}
+
+// ══════════════════════════════════════════
+// MODAL NOUVEAU PROJET
+// ══════════════════════════════════════════
+function openNewProjectModal() {
+  document.getElementById('new-project-modal').classList.add('open');
+  document.getElementById('np-name').value = '';
+  document.getElementById('np-deadline').value = '';
+  resetUploadZone();
+  selectedPdfFile = null;
+}
+function closeNewProjectModal() {
+  document.getElementById('new-project-modal').classList.remove('open');
+}
+function resetUploadZone() {
+  const zone = document.getElementById('upload-zone');
+  zone.className = 'upload-zone';
+  document.getElementById('upload-icon').textContent = '📁';
+  document.getElementById('upload-label').textContent = 'Cliquez ou glissez le PDF ici';
+}
+function handleDragOver(e) { e.preventDefault(); document.getElementById('upload-zone').classList.add('drag'); }
+function handleDragLeave() { document.getElementById('upload-zone').classList.remove('drag'); }
+function handleDrop(e) {
+  e.preventDefault(); document.getElementById('upload-zone').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type === 'application/pdf') setSelectedFile(f);
+}
+function handleFileSelect(input) { if (input.files[0]) setSelectedFile(input.files[0]); }
+function setSelectedFile(f) {
+  selectedPdfFile = f;
+  document.getElementById('upload-zone').classList.add('has-file');
+  document.getElementById('upload-icon').textContent = '✅';
+  document.getElementById('upload-label').textContent = f.name;
+  if (!document.getElementById('np-name').value) {
+    document.getElementById('np-name').value = f.name.replace('.pdf','');
+  }
+}
+
+async function createProject() {
+  const name = document.getElementById('np-name').value.trim();
+  const deadline = document.getElementById('np-deadline').value;
+  if (!name) { alert('Donnez un nom au projet.'); return; }
+  if (!deadline) { alert('La date limite est obligatoire.'); return; }
+
+  const proj = {
+    id: 'p_' + Date.now(),
+    name, deadline,
+    created: new Date().toISOString(),
+    books: [],
+    status: selectedPdfFile ? 'processing' : 'empty'
+  };
+  projects.unshift(proj);
+  saveProjects();
+  closeNewProjectModal();
+  openProject(proj.id);
+
+  if (selectedPdfFile) {
+    await extractFromPdf(selectedPdfFile, proj.id);
+  }
+}
+
+// ══════════════════════════════════════════
+// EXTRACTION PDF
+// ══════════════════════════════════════════
+async function extractFromPdf(file, projId) {
+  if (!apiKey) {
+    showBanner('Clé API manquante — renseignez-la dans le panneau gauche pour extraire le contenu.', 100);
+    return;
+  }
+
+  showBanner('Lecture du PDF…', 10);
+
+  const b64 = await fileToBase64(file);
+
+  const prompt = `Tu es un assistant expert en librairie. Analyse ce bon de commande PDF et extrais uniquement les livres réels.
+
+RÈGLES D'EXCLUSION — ignore complètement ces lignes :
+- Lignes de kits commerciaux (commençant par "KIT ", "COL ", "CPT ", "STP ", "BOX ", "LOT DE ", "COLIS ")
+- Lignes de publicité/PLV (éditeur GALLIMARD PUBLICITE, FOLIO BOITE FOLIO, etc., ou prix = 0,00)
+- En-têtes de section (LITTERATURE, RAPPELS, AJOUTS, SYNERGIE, PLEIADE, etc.)
+- Lignes d'encarts ou affiches (STICKER, AFFICHE, ENCART, KAKEMONO, MARQUE PAGES)
+- Lignes avec auteur "XXX" ou "AAAA"
+- Entrées avec titre en surbrillance bleue/cyan qui ressemblent à des opérations commerciales
+
+INCLURE uniquement : les livres avec un EAN/ISBN réel (13 chiffres), un titre de livre et un auteur lisible.
+
+Pour chaque livre retenu, génère un objet JSON avec ces champs :
+{
+  "isbn": "EAN 13 chiffres sans espaces",
+  "title": "titre complet du livre",
+  "author": "Nom Prénom de l'auteur",
+  "publisher": "maison d'édition",
+  "collection": "nom de la collection si indiqué",
+  "price": 19.00,
+  "date_mev": "JJ/MM/AAAA",
+  "category": "déduis la catégorie parmi : Littérature, Littérature Poche, Policier, Jeunesse, BD, Cuisine, Beaux Arts, Pratique, Autre",
+  "type": "nouveau si nouveauté 2027, reedition si réédition/rappel, catalogue si catalogue expo, inconnu sinon",
+  "summary_court": "EMBARGO",
+  "summary_moyen": "EMBARGO",
+  "summary_long": "EMBARGO"
+}
+
+RÈGLE ABSOLUE SUR LES RÉSUMÉS : Ce PDF est un bon de commande, pas une base bibliographique. Il ne contient PAS de descriptions. Mets TOUJOURS "EMBARGO" pour les trois champs résumé. Ne jamais inventer de résumé.
+
+Réponds UNIQUEMENT avec le tableau JSON, commençant par [ et finissant par ]. Aucun texte avant ou après. Aucun markdown, aucun bloc de code.`;
+
+  try {
+    showBanner('Analyse par l\'IA…', 30);
+    showBanner('Envoi à l\'API (<b>peut prendre 30-60 s</b> pour un gros PDF)…', 40);
+    const raw = await callLLM({ userText: prompt, pdfB64: b64, maxTokens: 16000 });
+    showBanner('Traitement des résultats…', 80);
+
+    // Extraction JSON robuste — cherche le premier [ ... ] même si l'IA a ajouté du texte
+    let jsonStr = null;
+    // 1. Essai direct
+    const directMatch = raw.match(/^\s*(\[[\s\S]*\])\s*$/);
+    if (directMatch) jsonStr = directMatch[1];
+    // 2. Cherche le tableau JSON même entouré de texte
+    if (!jsonStr) {
+      const bracketStart = raw.indexOf('[');
+      const bracketEnd = raw.lastIndexOf(']');
+      if (bracketStart !== -1 && bracketEnd > bracketStart) {
+        jsonStr = raw.substring(bracketStart, bracketEnd + 1);
+      }
+    }
+    // 3. Cherche dans un bloc ```json ... ```
+    if (!jsonStr) {
+      const codeMatch = raw.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
+      if (codeMatch) jsonStr = codeMatch[1];
+    }
+    if (!jsonStr) {
+      // Affiche les 300 premiers caractères de la réponse brute pour diagnostic
+      const preview = raw.substring(0, 300).replace(/</g,'&lt;');
+      throw new Error(`Aucun tableau JSON dans la réponse. Début de la réponse reçue :<br><code style="font-size:.7rem;word-break:break-all;">${preview || '(vide)'}</code>`);
+    }
+
+    let books;
+    try {
+      books = JSON.parse(jsonStr);
+    } catch(parseErr) {
+      // 1. Nettoyage caractères de contrôle + virgules traînantes
+      let cleaned = jsonStr.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ').replace(/,\s*([}\]])/g, '$1');
+      try {
+        books = JSON.parse(cleaned);
+      } catch(e2) {
+        // 2. JSON tronqué : fermer les objets/tableaux ouverts
+        // Trouver le dernier objet complet (se termine par })
+        const lastGood = cleaned.lastIndexOf('}');
+        if (lastGood > 0) {
+          let truncated = cleaned.substring(0, lastGood + 1);
+          // Supprimer la virgule éventuelle après le dernier }
+          truncated = truncated.replace(/,\s*$/, '');
+          try {
+            books = JSON.parse('[' + truncated.replace(/^\s*\[/, '') + ']');
+          } catch(e3) {
+            throw new Error(`JSON invalide même après réparation. Erreur : ${e3.message}. Essayez avec Gemini ou relancez l'extraction.`);
+          }
+        } else {
+          throw new Error(`Réponse JSON non parsable : ${parseErr.message}`);
+        }
+      }
+    }
+    if (!Array.isArray(books)) throw new Error('La réponse JSON n\'est pas un tableau.');
+    const proj = projects.find(p=>p.id===projId);
+    if (proj) {
+      proj.books = books.map((b, i) => ({
+        ...b, id: 'b_'+i, decision: 'nd', scores: []
+      }));
+      proj.status = 'ready';
+      saveProjects();
+      renderBookList();
+      updateCounters();
+    }
+    showBanner(`✓ ${books.length} titres extraits avec succès`, 100);
+    setTimeout(hideBanner, 2500);
+
+  } catch (e) {
+    showBanner('❌ Erreur d\'extraction : ' + e.message, 100);
+    console.error('Extraction error:', e);
+    // Ne pas laisser le projet en état "processing" bloqué
+    const projErr = projects.find(p=>p.id===projId);
+    if (projErr && projErr.status === 'processing') {
+      projErr.status = 'error';
+      saveProjects();
+    }
+  }
+}
+
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = () => res(reader.result.split(',')[1]);
+    reader.onerror = rej;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ══════════════════════════════════════════
+// OPEN PROJECT
+// ══════════════════════════════════════════
+function openProject(id) {
+  currentProjectId = id;
+  scores = {};
+  catFilter = 'all'; typeFilter = 'all'; decFilter = 'all';
+  document.getElementById('screen-home').classList.remove('active');
+  document.getElementById('screen-project').classList.add('active');
+
+  const proj = getProject();
+  document.getElementById('project-title-bar').textContent = proj.name;
+  document.getElementById('counter-imported').textContent = (proj.books||[]).length;
+  renderDeadlineBadge();
+  buildCatChips();
+  renderBookList();
+  updateCounters();
+}
+
+function goHome() {
+  document.getElementById('screen-project').classList.remove('active');
+  document.getElementById('screen-home').classList.add('active');
+  renderHome();
+}
+
+function renderDeadlineBadge() {
+  const proj = getProject();
+  const days = Math.ceil((new Date(proj.deadline) - new Date()) / 86400000);
+  const badge = document.getElementById('deadline-badge');
+  const dateStr = new Date(proj.deadline).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});
+  const cls = days > 7 ? 'green' : days > 3 ? 'orange' : 'red';
+  badge.className = 'deadline-badge ' + cls;
+  badge.textContent = `📅 ${dateStr} (${days > 0 ? days + ' j' : 'dépassé'})`;
+}
+
+function buildCatChips() {
+  const proj = getProject();
+  const cats = [...new Set((proj.books||[]).map(b=>b.category).filter(Boolean))];
+  const wrap = document.getElementById('cat-chips');
+  wrap.innerHTML = `<button class="chip active" data-cat="all" onclick="setCatFilter('all',this)">Tout</button>`;
+  cats.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'chip'; btn.dataset.cat = c;
+    btn.textContent = c;
+    btn.onclick = function() { setCatFilter(c, this); };
+    wrap.appendChild(btn);
+  });
+}
+
+// ══════════════════════════════════════════
+// FILTERS
+// ══════════════════════════════════════════
+function setCatFilter(c, btn) {
+  catFilter = c;
+  document.querySelectorAll('#cat-chips .chip').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active'); renderBookList();
+}
+function setTypeFilter(t, btn) {
+  typeFilter = t;
+  document.querySelectorAll('[data-type]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active'); renderBookList();
+}
+function setDecFilter(d, btn) {
+  decFilter = d;
+  document.querySelectorAll('[data-dec]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active'); renderBookList();
+}
+function setDepth(d, btn) {
+  depthMode = d;
+  document.querySelectorAll('.depth-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active'); renderBookList();
+}
+
+// ══════════════════════════════════════════
+// RENDER BOOKS
+// ══════════════════════════════════════════
+function renderBookList() {
+  const proj = getProject();
+  if (!proj) return;
+  let books = proj.books || [];
+
+  if (catFilter !== 'all') books = books.filter(b=>b.category===catFilter);
+  if (typeFilter !== 'all') books = books.filter(b=>b.type===typeFilter);
+  if (decFilter !== 'all') books = books.filter(b=>(b.decision||'nd')===decFilter);
+
+  const list = document.getElementById('book-list');
+
+  if (proj.status === 'processing' || books.length === 0 && proj.status !== 'ready') {
+    list.innerHTML = '<div style="color:var(--muted);font-size:.82rem;padding:20px;">Importez un PDF pour commencer.</div>';
+    return;
+  }
+
+  if (books.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:.82rem;padding:20px;">Aucun livre ne correspond à ces filtres.</div>';
+    return;
+  }
+
+  list.innerHTML = books.map(b => bookCardHTML(b)).join('');
+}
+
+function bookCardHTML(b) {
+  const summary = b['summary_'+depthMode] || b.summary_court || '';
+  const embargo = summary === 'EMBARGO' || !summary;
+  const badges = { nouveau:'badge-nouveau', reedition:'badge-reedition', catalogue:'badge-catalogue', inconnu:'badge-inconnu' };
+  const labels = { nouveau:'Nouveauté', reedition:'Réédition', catalogue:'Catalogue', inconnu:'?' };
+  const bc = badges[b.type]||'badge-inconnu';
+  const bl = labels[b.type]||'?';
+
+  const decState = b.decision || 'nd';
+  const decOui  = decState==='oui'  ? 'active-oui' : '';
+  const decNon  = decState==='non'  ? 'active-non' : '';
+  const decNd   = decState==='nd'   ? 'active-nd'  : '';
+
+  const bookScores = (b.scores||[]);
+  const scoresHTML = bookScores.length > 0 ? `<div class="book-scores">
+    ${bookScores.map(s=>{
+      const p = profiles[s.profileIdx];
+      if(!p) return '';
+      const init = p.nom.substring(0,2).toUpperCase();
+      const col = s.score>=70?'var(--green)':s.score>=40?'var(--orange)':'var(--red)';
+      return `<div class="score-row">
+        <div class="score-av" style="background:${p.couleur}">${init}</div>
+        <div class="score-name">${p.nom}</div>
+        <div class="score-track"><div class="score-fill" style="width:${s.score}%;background:${col}"></div></div>
+        <div class="score-pct" style="color:${col}">${s.score}%</div>
+      </div>
+      <div class="score-reason">${s.reason||''}</div>`;
+    }).join('')}
+  </div>` : '';
+
+  return `<div class="book-card" id="card-${b.id}">
+    <div class="book-decision">
+      <button class="dec-btn ${decOui}" title="Je commande" onclick="setDecision('${b.id}','oui')">✓</button>
+      <button class="dec-btn ${decNon}" title="Je ne commande pas" onclick="setDecision('${b.id}','non')">✗</button>
+      <button class="dec-btn ${decNd}" title="Indécis" onclick="setDecision('${b.id}','nd')">?</button>
+    </div>
+    <div class="book-content">
+      <div class="book-header">
+        <span class="type-badge ${bc}">${bl}</span>
+        <div class="book-title">${b.title||'Titre inconnu'}</div>
+      </div>
+      <div class="book-author">${b.author||''}</div>
+      <div class="book-meta">
+        ${b.publisher?`<span>${b.publisher}</span>`:''}
+        ${b.price?`<span>${Number(b.price).toFixed(2)} €</span>`:''}
+        ${b.category?`<span>${b.category}</span>`:''}
+      </div>
+      ${embargo
+        ? `<div class="book-embargo">📵 Titre sous embargo — aucune information disponible pour ce livre (secret de publication)</div>`
+        : `<div class="book-summary">${summary}</div>`
+      }
+      ${scoresHTML}
+    </div>
+    <div class="book-actions">
+      <button class="source-btn" onclick="openSourceModal('${b.id}')">🔍 Source</button>
+      ${b.isbn ? `<div class="isbn-label">ISBN : ${b.isbn}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+function setDecision(bookId, dec) {
+  const proj = getProject();
+  const book = (proj.books||[]).find(b=>b.id===bookId);
+  if (book) {
+    book.decision = dec;
+    saveProjects();
+    // Update just the buttons
+    const card = document.getElementById('card-'+bookId);
+    if (card) {
+      const btns = card.querySelectorAll('.dec-btn');
+      btns[0].className = 'dec-btn' + (dec==='oui'?' active-oui':'');
+      btns[1].className = 'dec-btn' + (dec==='non'?' active-non':'');
+      btns[2].className = 'dec-btn' + (dec==='nd'?' active-nd':'');
+    }
+    updateCounters();
+  }
+}
+
+function updateCounters() {
+  const proj = getProject();
+  if (!proj) return;
+  const books = proj.books||[];
+  document.getElementById('stat-oui').textContent = books.filter(b=>b.decision==='oui').length;
+  document.getElementById('stat-non').textContent = books.filter(b=>b.decision==='non').length;
+  document.getElementById('stat-nd').textContent = books.filter(b=>!b.decision||b.decision==='nd').length;
+  document.getElementById('counter-imported').textContent = books.length;
+}
+
+// ══════════════════════════════════════════
+// PROCESSING BANNER
+// ══════════════════════════════════════════
+function showBanner(msg, pct) {
+  const b = document.getElementById('processing-banner');
+  b.style.display = 'block';
+  // Style rouge si erreur
+  if (msg.includes('❌') || msg.includes('Erreur')) {
+    b.style.borderColor = 'var(--red)';
+    b.style.background = 'rgba(248,113,113,0.07)';
+  } else {
+    b.style.borderColor = 'var(--accent)';
+    b.style.background = '';
+  }
+  document.getElementById('processing-text').innerHTML = msg;
+  document.getElementById('prog-fill').style.width = pct + '%';
+}
+function hideBanner() { document.getElementById('processing-banner').style.display = 'none'; }
+
+// ══════════════════════════════════════════
+// SOURCE MODAL (ISBN lookup)
+// ══════════════════════════════════════════
+async function openSourceModal(bookId) {
+  const proj = getProject();
+  const book = (proj.books||[]).find(b=>b.id===bookId);
+  if (!book) return;
+
+  document.getElementById('source-modal-title').textContent = book.title||'Fiche du livre';
+  document.getElementById('source-modal-body').innerHTML = '<div class="source-loading">🔍 Recherche en cours…</div>';
+  document.getElementById('source-modal').classList.add('open');
+
+  // Try Open Library first (free, no API key needed)
+  const isbn = (book.isbn||'').replace(/[^0-9X]/gi,'');
+  if (isbn) {
+    try {
+      const olUrl = `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`;
+      const r = await fetch(olUrl);
+      const d = await r.json();
+      const key = `ISBN:${isbn}`;
+      if (d[key]) {
+        const info = d[key];
+        const cover = info.cover?.large || info.cover?.medium || null;
+        const desc = info.description?.value || info.description || null;
+        const olPageUrl = `https://openlibrary.org${info.key}`;
+        document.getElementById('source-modal-body').innerHTML = `
+          ${cover ? `<img src="${cover}" class="source-cover" alt="couverture">` : ''}
+          <div class="source-title">${info.title||book.title}</div>
+          <div class="source-author">${(info.authors||[]).map(a=>a.name).join(', ')||book.author}</div>
+          <div class="source-desc">${desc || '<em style="color:var(--dim)">Aucune description disponible sur Open Library.</em>'}</div>
+          <div class="source-link-row">
+            <a href="${olPageUrl}" target="_blank" class="source-link">🔗 Voir sur Open Library</a>
+            ${book.isbn ? `<a href="https://www.decitre.fr/recherche/result.html?q=${isbn}" target="_blank" class="source-link">📖 Decitre</a>` : ''}
+          </div>`;
+        return;
+      }
+    } catch(e) { console.warn('Open Library error', e); }
+  }
+
+  // Fallback : liens externes
+  const q = encodeURIComponent((book.title||'') + ' ' + (book.author||''));
+  const isbnQ = isbn ? encodeURIComponent(isbn) : q;
+  document.getElementById('source-modal-body').innerHTML = `
+    <div class="source-embargo">
+      <div class="embargo-icon">📵</div>
+      <h4>Aucune information trouvée automatiquement</h4>
+      <p>Ce titre est peut-être sous embargo de publication, ou son ISBN n'est pas encore référencé dans les bases ouvertes.</p>
+    </div>
+    <div style="margin-top:16px;">
+      <div style="font-size:.72rem;color:var(--muted);margin-bottom:8px;">Chercher manuellement :</div>
+      <div class="source-link-row">
+        ${isbn ? `<a href="https://openlibrary.org/isbn/${isbn}" target="_blank" class="source-link">Open Library</a>` : ''}
+        <a href="https://www.electre.com/search?q=${isbnQ}" target="_blank" class="source-link">Electre</a>
+        <a href="https://www.decitre.fr/recherche/result.html?q=${isbnQ}" target="_blank" class="source-link">Decitre</a>
+        <a href="https://www.fnac.com/SearchResult/ResultList.aspx?Search=${isbnQ}" target="_blank" class="source-link">Fnac</a>
+      </div>
+    </div>`;
+}
+
+function closeSourceModal() { document.getElementById('source-modal').classList.remove('open'); }
+
+// ══════════════════════════════════════════
+// PROFILES
+// ══════════════════════════════════════════
+function openProfilesModal() {
+  renderProfilesBody();
+  document.getElementById('profiles-modal').classList.add('open');
+}
+function closeProfilesModal() { document.getElementById('profiles-modal').classList.remove('open'); }
+
+function renderProfilesBody() {
+  const body = document.getElementById('profiles-body');
+  body.innerHTML = profiles.map((p, i) => {
+    const init = p.nom.substring(0,2).toUpperCase();
+    return `<div class="profile-item" id="profile-item-${i}">
+      <div class="profile-item-header">
+        <div class="p-avatar" style="background:${p.couleur}">${init}</div>
+        <div class="p-name">${p.nom}</div>
+        <button class="p-toggle" onclick="toggleProfileEdit(${i})">✏️ Éditer</button>
+      </div>
+      <label class="p-select-row">
+        <input type="checkbox" ${p.selected?'checked':''} onchange="toggleProfileSelect(${i},this)">
+        Inclure dans le scoring
+      </label>
+      <div class="p-json-wrap" id="pjson-${i}">
+        <textarea id="ptxt-${i}">${JSON.stringify(p.gouts,null,2)}</textarea>
+        <button class="p-save-btn" onclick="saveProfileEdit(${i})">💾 Sauvegarder</button>
+      </div>
+    </div>`;
+  }).join('') + `<button class="add-profile-btn" onclick="addProfile()">＋ Ajouter un profil</button>`;
+}
+
+function toggleProfileEdit(i) {
+  document.getElementById('pjson-'+i).classList.toggle('open');
+}
+function toggleProfileSelect(i, cb) {
+  profiles[i].selected = cb.checked;
+  saveProfiles();
+}
+function saveProfileEdit(i) {
+  try {
+    profiles[i].gouts = JSON.parse(document.getElementById('ptxt-'+i).value);
+    saveProfiles();
+    document.getElementById('pjson-'+i).classList.remove('open');
+  } catch(e) { alert('JSON invalide : '+e.message); }
+}
+function addProfile() {
+  const nom = prompt('Nom du profil :');
+  if (!nom) return;
+  const couleurs = ['#7c6af7','#f4b942','#22d3ee','#4ade80','#fb923c','#c084fc'];
+  profiles.push({ nom, couleur: couleurs[profiles.length % couleurs.length], selected: true,
+    gouts:{ genres_aimes:[], themes_aimes:[], anti_gouts:[], notes:'' }});
+  saveProfiles();
+  renderProfilesBody();
+}
+
+// ══════════════════════════════════════════
+// API CONFIG
+// ══════════════════════════════════════════
+function selectApi(provider, btn) {
+  apiProvider = provider;
+  document.querySelectorAll('.api-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  onApiKey(document.getElementById('api-key').value);
+}
+function onApiKey(val) {
+  apiKey = val.trim();
+  const dot = document.getElementById('api-dot');
+  const txt = document.getElementById('api-status-txt');
+  if (!apiKey) { dot.className='api-dot'; txt.textContent='Aucune clé'; return; }
+  const valid = apiProvider==='claude' ? apiKey.startsWith('sk-ant-') : apiKey.startsWith('AIza');
+  dot.className = 'api-dot ' + (valid?'ok':'err');
+  txt.textContent = valid ? '✓ Format valide' : '✗ Format incorrect';
+}
+function toggleApiVis() {
+  const inp = document.getElementById('api-key');
+  inp.type = inp.type==='password' ? 'text' : 'password';
+}
+
+// ══════════════════════════════════════════
+// API CALL
+// ══════════════════════════════════════════
+async function callLLM({ userText, pdfB64, maxTokens }) {
+  if (!apiKey) throw new Error('Clé API manquante');
+
+  if (apiProvider === 'claude') {
+    const content = [];
+    if (pdfB64) content.push({ type:'document', source:{ type:'base64', media_type:'application/pdf', data:pdfB64 }});
+    content.push({ type:'text', text:userText });
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens: maxTokens||4000, messages:[{role:'user',content}] })
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error.message);
+    return d.content.map(i=>i.text||'').join('');
+
+  } else {
+    const parts = [];
+    if (pdfB64) parts.push({ inline_data:{ mime_type:'application/pdf', data:pdfB64 }});
+    parts.push({ text: userText });
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const r = await fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ contents:[{parts}], generationConfig:{ maxOutputTokens:maxTokens||4000, temperature:0.2 }})
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error.message);
+    return (d.candidates[0].content?.parts||[]).map(p=>p.text||'').join('');
+  }
+}
+
+// ══════════════════════════════════════════
+// SCORING
+// ══════════════════════════════════════════
+async function computeScores() {
+  if (!apiKey) { alert('Clé API requise.'); return; }
+  const selectedProfiles = profiles.map((p,i)=>({...p,i})).filter(p=>p.selected);
+  if (selectedProfiles.length === 0) { alert('Cochez au moins un profil.'); return; }
+  if (computing) return;
+  computing = true;
+  document.getElementById('score-btn').disabled = true;
+
+  const proj = getProject();
+  const books = proj.books||[];
+  const total = selectedProfiles.length;
+  let done = 0;
+
+  // Clear existing scores
+  books.forEach(b => { b.scores = []; });
+
+  for (const p of selectedProfiles) {
+    showBanner(`Scoring profil <b>${p.nom}</b> (${done+1}/${total})…`, Math.round(done/total*100));
+
+    const list = books.map(b=>`[${b.id}] "${b.title}" par ${b.author||'?'} (${b.category||'?'}) — ${b.summary_court&&b.summary_court!=='EMBARGO'?b.summary_court:'pas de description disponible'}`).join('\n');
+
+    const prompt = `Tu es un assistant pour libraires. Voici le profil d'un libraire :
+Nom : ${p.nom}
+Genres aimés : ${(p.gouts.genres_aimes||[]).join(', ')||'(non précisé)'}
+Thèmes aimés : ${(p.gouts.themes_aimes||[]).join(', ')||'(non précisé)'}
+Anti-goûts : ${(p.gouts.anti_gouts||[]).join(', ')||'(aucun)'}
+Notes : ${p.gouts.notes||''}
+
+Liste des livres du bon de commande :
+${list}
+
+Pour chaque livre, donne un score de pertinence pour ce libraire de 0 à 100 et une raison courte (max 12 mots).
+Important : pour les titres sans description (embargo), donne un score neutre de 50 avec raison "Information insuffisante pour évaluer".
+
+Réponds UNIQUEMENT en JSON (tableau sans explication) :
+[{"id":"b_0","score":75,"reason":"Correspond aux intérêts artistiques du profil"},...]`;
+
+    try {
+      const raw = await callLLM({ userText: prompt, maxTokens: 6000 });
+      const match = raw.match(/\[[\s\S]*\]/);
+      if (match) {
+        const arr = JSON.parse(match[0]);
+        arr.forEach(item => {
+          const book = books.find(b=>b.id===item.id);
+          if (book) book.scores.push({ profileIdx: p.i, score: item.score, reason: item.reason });
+        });
+      }
+    } catch(e) { console.error('Score error', p.nom, e); }
+
+    done++;
+  }
+
+  proj.books = books;
+  saveProjects();
+  computing = false;
+  document.getElementById('score-btn').disabled = false;
+  showBanner('✓ Scores calculés !', 100);
+  setTimeout(hideBanner, 2000);
+  renderBookList();
+}
+
+// ══════════════════════════════════════════
+// EXPORT
+// ══════════════════════════════════════════
+function exportSelection() {
+  const proj = getProject();
+  const sel = (proj.books||[]).filter(b=>b.decision==='oui');
+  if (sel.length === 0) { alert('Aucun titre sélectionné.'); return; }
+
+  const lines = ['Titre\tAuteur\tÉditeur\tISBN\tPrix\tCatégorie\tType'];
+  sel.forEach(b => lines.push([b.title, b.author, b.publisher, b.isbn, b.price, b.category, b.type].join('\t')));
+  const blob = new Blob([lines.join('\n')], {type:'text/tab-separated-values;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = proj.name.replace(/[^a-z0-9]/gi,'_') + '_selection.tsv';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ══════════════════════════════════════════
+// SETUP MODAL (1er démarrage / config API)
+// ══════════════════════════════════════════
+let setupProvider = savedApiProvider;
+
+function openSetupModal() {
+  setupProvider = apiProvider;
+  const inp = document.getElementById('setup-key-input');
+  inp.value = apiKey;
+  document.getElementById('setup-tab-claude').classList.toggle('active', setupProvider==='claude');
+  document.getElementById('setup-tab-gemini').classList.toggle('active', setupProvider==='gemini');
+  updateSetupHelp();
+  setupOnApiKey(apiKey);
+  document.getElementById('setup-modal').classList.add('open');
+}
+
+function closeSetupModal() {
+  document.getElementById('setup-modal').classList.remove('open');
+}
+
+function setupSelectApi(p) {
+  setupProvider = p;
+  document.getElementById('setup-tab-claude').classList.toggle('active', p==='claude');
+  document.getElementById('setup-tab-gemini').classList.toggle('active', p==='gemini');
+  updateSetupHelp();
+  setupOnApiKey(document.getElementById('setup-key-input').value);
+}
+
+function updateSetupHelp() {
+  const lbl = document.getElementById('setup-key-label');
+  const help = document.getElementById('setup-help-text');
+  if (setupProvider === 'claude') {
+    lbl.innerHTML = 'Clé API Claude <small style="color:var(--dim)">(commence par sk-ant-)</small>';
+    help.innerHTML = 'Claude : <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent2)">console.anthropic.com → API Keys</a><br>La clé est utilisée uniquement dans votre navigateur.';
+  } else {
+    lbl.innerHTML = 'Clé API Gemini <small style="color:var(--dim)">(commence par AIza)</small>';
+    help.innerHTML = 'Gemini : <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent2)">aistudio.google.com → Get API key</a><br>La clé est utilisée uniquement dans votre navigateur.';
+  }
+}
+
+function setupOnApiKey(val) {
+  const dot = document.getElementById('setup-dot');
+  const txt = document.getElementById('setup-status');
+  const v = val.trim();
+  if (!v) { dot.className='api-dot'; txt.textContent='Aucune clé saisie'; return; }
+  const valid = setupProvider==='claude' ? v.startsWith('sk-ant-') : v.startsWith('AIza');
+  dot.className = 'api-dot ' + (valid?'ok':'err');
+  txt.textContent = valid ? '✓ Format valide' : '✗ Format incorrect (vérifiez la clé)';
+}
+
+function setupToggleVis() {
+  const inp = document.getElementById('setup-key-input');
+  inp.type = inp.type==='password' ? 'text' : 'password';
+}
+
+function saveSetupAndClose() {
+  const val = document.getElementById('setup-key-input').value.trim();
+  apiProvider = setupProvider;
+  apiKey = val;
+  localStorage.setItem('bdc_api_provider', apiProvider);
+  if (val) localStorage.setItem('bdc_api_key', val);
+  // Sync le sélecteur dans la sidebar projet
+  document.querySelectorAll('.api-tab').forEach(b => b.classList.remove('active'));
+  const sideTab = document.querySelector(`.api-tab[onclick*="${apiProvider}"]`);
+  if (sideTab) sideTab.classList.add('active');
+  const sideInp = document.getElementById('api-key');
+  if (sideInp) { sideInp.value = apiKey; onApiKey(apiKey); }
+  closeSetupModal();
+}
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+renderHome();
+// Set today as default deadline (+14 days)
+const dl = document.getElementById('np-deadline');
+const def = new Date(); def.setDate(def.getDate()+14);
+dl.value = def.toISOString().split('T')[0];
+
+// Pré-remplir la sidebar avec la clé sauvegardée
+if (savedApiKey) {
+  document.getElementById('api-key').value = savedApiKey;
+  onApiKey(savedApiKey);
+  document.querySelectorAll('.api-tab').forEach(b=>b.classList.remove('active'));
+  const t = document.querySelector(`.api-tab[onclick*="${savedApiProvider}"]`);
+  if(t) t.classList.add('active');
+}
+
+// Ajouter bouton config dans la topbar
+document.querySelector('.home-topbar').insertAdjacentHTML('beforeend',
+  `<button class="btn-secondary" onclick="openSetupModal()" title="Paramètres API">⚙️ API</button>`);
+
+// Premier démarrage : pas de clé → ouvrir la config
+if (!savedApiKey) {
+  setTimeout(openSetupModal, 400);
+}
+</script>
+</body>
+</html>
