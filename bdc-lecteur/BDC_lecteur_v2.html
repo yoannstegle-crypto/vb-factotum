@@ -242,6 +242,10 @@ input, select, textarea { font-family: inherit; }
 .book-author { font-size: 0.75rem; color: var(--accent2); margin-bottom: 4px; }
 .book-meta { font-size: 0.7rem; color: var(--dim); display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
 .book-summary { font-size: 0.78rem; color: var(--muted); line-height: 1.55; }
+.book-nosummary { font-size: 0.72rem; color: var(--dim); font-style: italic; margin-top: 4px; }
+.summary-source { font-size: 0.62rem; color: var(--dim); margin-top: 4px; }
+.summary-source a { color: var(--dim); }
+.summary-source a:hover { color: var(--accent2); }
 .book-embargo {
   font-size: 0.75rem; color: var(--orange); font-style: italic;
   background: rgba(251,146,60,.07); border: 1px solid rgba(251,146,60,.2);
@@ -435,6 +439,7 @@ input, select, textarea { font-family: inherit; }
 
       <!-- Export -->
       <div>
+        <button class="export-btn" id="summaries-btn" onclick="fetchAllSummaries()" style="margin-bottom:8px;">📝 Chercher tous les résumés</button>
         <button class="export-btn" onclick="exportSelection()">📥 Exporter la sélection</button>
       </div>
 
@@ -907,8 +912,8 @@ function renderBookList() {
 }
 
 function bookCardHTML(b) {
-  const summary = b['summary_'+depthMode] || b.summary_court || '';
-  const embargo = summary === 'EMBARGO' || !summary;
+  const hasSummary = b.summary_status === 'ok';
+  const summary = hasSummary ? (b['summary_'+depthMode] || b.summary_court || '') : '';
   const badges = { nouveau:'badge-nouveau', reedition:'badge-reedition', catalogue:'badge-catalogue', inconnu:'badge-inconnu' };
   const labels = { nouveau:'Nouveauté', reedition:'Réédition', catalogue:'Catalogue', inconnu:'?' };
   const bc = badges[b.type]||'badge-inconnu';
@@ -932,7 +937,7 @@ function bookCardHTML(b) {
         <div class="score-track"><div class="score-fill" style="width:${s.score}%;background:${col}"></div></div>
         <div class="score-pct" style="color:${col}">${s.score}%</div>
       </div>
-      <div class="score-reason">${s.reason||''}</div>`;
+      <div class="score-reason">${esc(s.reason||'')}</div>`;
     }).join('')}
   </div>` : '';
 
@@ -945,23 +950,27 @@ function bookCardHTML(b) {
     <div class="book-content">
       <div class="book-header">
         <span class="type-badge ${bc}">${bl}</span>
-        <div class="book-title">${b.title||'Titre inconnu'}</div>
+        <div class="book-title">${esc(b.title||'Titre inconnu')}</div>
       </div>
-      <div class="book-author">${b.author||''}</div>
+      <div class="book-author">${esc(b.author||'')}</div>
       <div class="book-meta">
-        ${b.publisher?`<span>${b.publisher}</span>`:''}
+        ${b.publisher?`<span>${esc(b.publisher)}</span>`:''}
         ${b.price?`<span>${Number(b.price).toFixed(2)} €</span>`:''}
-        ${b.category?`<span>${b.category}</span>`:''}
+        ${b.category?`<span>${esc(b.category)}</span>`:''}
       </div>
-      ${embargo
-        ? `<div class="book-embargo">📵 Titre sous embargo — aucune information disponible pour ce livre (secret de publication)</div>`
-        : `<div class="book-summary">${summary}</div>`
+      ${hasSummary
+        ? `<div class="book-summary">${esc(summary)}</div>
+           <div class="summary-source">Source : ${b.summary_url ? `<a href="${esc(b.summary_url)}" target="_blank" rel="noopener">${esc(b.summary_source||'lien')}</a>` : esc(b.summary_source||'?')}</div>`
+        : b.summary_status === 'introuvable'
+          ? `<div class="book-embargo">📵 Aucun résumé trouvé${b.summary_note ? ' — ' + esc(b.summary_note) : ' (titre peut-être pas encore paru ou sous embargo)'}</div>`
+          : `<div class="book-nosummary">Résumé non chargé — cliquez sur 📝 Résumé</div>`
       }
       ${scoresHTML}
     </div>
     <div class="book-actions">
       <button class="source-btn" onclick="openSourceModal('${b.id}')">🔍 Source</button>
-      ${b.isbn ? `<div class="isbn-label">ISBN : ${b.isbn}</div>` : ''}
+      ${hasSummary ? '' : `<button class="source-btn" id="sumbtn-${b.id}" onclick="fetchSummaryFor('${b.id}')">📝 Résumé</button>`}
+      ${b.isbn ? `<div class="isbn-label">ISBN : ${esc(b.isbn)}</div>` : ''}
     </div>
   </div>`;
 }
@@ -1073,6 +1082,182 @@ async function openSourceModal(bookId) {
 }
 
 function closeSourceModal() { document.getElementById('source-modal').classList.remove('open'); }
+
+// ══════════════════════════════════════════
+// RÉSUMÉS (Google Books, puis Claude + recherche web)
+// ══════════════════════════════════════════
+let googleBooksBlocked = false; // quota Google Books épuisé : on ne réessaie plus pendant la session
+let summariesRunning = false;
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function stripHtml(s) {
+  const d = new DOMParser().parseFromString(String(s||''), 'text/html');
+  return (d.body.textContent || '').replace(/\s+/g, ' ').trim();
+}
+// Coupe à la fin d'une phrase si possible, sinon à un mot.
+function cutText(s, n) {
+  if (s.length <= n) return s;
+  const t = s.slice(0, n);
+  const k = Math.max(t.lastIndexOf('. '), t.lastIndexOf('! '), t.lastIndexOf('? '));
+  if (k > n * 0.4) return t.slice(0, k + 1);
+  return t.slice(0, t.lastIndexOf(' ')) + '…';
+}
+
+async function summaryFromGoogleBooks(book) {
+  if (googleBooksBlocked || !book.isbn) return null;
+  const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(book.isbn)}`);
+  if (r.status === 429 || r.status === 403) { googleBooksBlocked = true; return null; }
+  if (!r.ok) return null;
+  const d = await r.json();
+  const vi = d.items && d.items[0] && d.items[0].volumeInfo;
+  const desc = vi && stripHtml(vi.description);
+  if (!desc || desc.length < 40) return null;
+  return {
+    court: cutText(desc, 180), moyen: cutText(desc, 450), long: desc,
+    source: 'Google Books', url: vi.infoLink || ''
+  };
+}
+
+async function summaryFromClaudeWeb(book) {
+  const prompt = `Trouve la présentation officielle (quatrième de couverture ou texte de l'éditeur) de ce livre :
+ISBN : ${book.isbn || '?'}
+Titre : ${book.title || '?'}
+Auteur : ${book.author || '?'}
+Éditeur / collection : ${book.publisher || '?'} ${book.collection || ''}
+Parution : ${book.date_mev || '?'}
+
+Cherche en priorité sur le site de l'éditeur, puis chez des libraires en ligne (Decitre, Fnac, Mollat, Place des Libraires, Leslibraires.fr…). Vérifie qu'il s'agit bien de ce livre : même titre et même auteur, et l'ISBN si possible.
+
+Rédige ensuite, en français et UNIQUEMENT à partir de ce que tu as trouvé :
+- court : une phrase (25 mots maximum)
+- moyen : 2 à 3 phrases
+- long : un paragraphe de 5 à 8 phrases
+
+Termine ta réponse par une seule ligne JSON, sans balises :
+{"court":"…","moyen":"…","long":"…","source":"nom du site","url":"adresse de la page utilisée"}
+Si tu ne trouves pas de présentation fiable de CE livre, termine plutôt par : {"introuvable":true}
+N'invente jamais de résumé.`;
+
+  const messages = [{ role:'user', content: prompt }];
+  let d;
+  for (let turn = 0; turn < 4; turn++) {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model:'claude-sonnet-4-6', max_tokens: 4000, messages,
+        tools:[{ type:'web_search_20260209', name:'web_search', max_uses: 4 }]
+      })
+    });
+    d = await r.json();
+    if (d.error) throw new Error(d.error.message);
+    if (d.stop_reason !== 'pause_turn') break;
+    messages.push({ role:'assistant', content: d.content });
+  }
+  const text = (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
+  const a = text.lastIndexOf('{'), z = text.lastIndexOf('}');
+  if (a < 0 || z < a) return null;
+  let j;
+  try { j = JSON.parse(text.slice(a, z + 1)); } catch (_) {
+    // l'objet peut contenir des accolades : on repart du premier {" de la dernière ligne JSON
+    const a2 = text.lastIndexOf('{"');
+    try { j = JSON.parse(text.slice(a2, z + 1)); } catch (_) { return null; }
+  }
+  if (!j || j.introuvable || !j.court) return null;
+  return { court: j.court, moyen: j.moyen || j.court, long: j.long || j.moyen || j.court, source: j.source || 'Web', url: j.url || '' };
+}
+
+// Cherche et enregistre le résumé d'un livre. Renvoie true si trouvé.
+async function loadSummary(book) {
+  let res = null;
+  try { res = await summaryFromGoogleBooks(book); } catch (e) { console.warn('Google Books', e); }
+  let note = '';
+  if (!res) {
+    if (apiProvider === 'claude' && apiKey) {
+      res = await summaryFromClaudeWeb(book); // les erreurs API remontent à l'appelant
+    } else {
+      note = 'absent de Google Books (la recherche web nécessite une clé Claude)';
+    }
+  }
+  if (res) {
+    book.summary_court = res.court;
+    book.summary_moyen = res.moyen;
+    book.summary_long = res.long;
+    book.summary_source = res.source;
+    book.summary_url = res.url;
+    book.summary_status = 'ok';
+  } else {
+    book.summary_status = 'introuvable';
+    book.summary_note = note;
+  }
+  return !!res;
+}
+
+function rerenderCard(book) {
+  const card = document.getElementById('card-' + book.id);
+  if (card) card.outerHTML = bookCardHTML(book);
+}
+
+async function fetchSummaryFor(bookId) {
+  const proj = getProject();
+  const book = (proj.books||[]).find(b => b.id === bookId);
+  if (!book) return;
+  const btn = document.getElementById('sumbtn-' + bookId);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Recherche…'; }
+  try {
+    await loadSummary(book);
+    saveProjects();
+  } catch (e) {
+    alert('Recherche du résumé impossible : ' + e.message);
+  }
+  rerenderCard(book);
+}
+
+async function fetchAllSummaries() {
+  if (summariesRunning) return;
+  const proj = getProject();
+  const todo = (proj.books||[]).filter(b => b.summary_status !== 'ok');
+  if (todo.length === 0) { alert('Tous les livres ont déjà un résumé.'); return; }
+  const msg = apiProvider === 'claude'
+    ? `Chercher le résumé de ${todo.length} livre(s) ?\n\nGoogle Books est consulté d'abord (gratuit). Les livres qu'il ne connaît pas sont cherchés par Claude sur le web, ce qui est facturé sur votre clé API.`
+    : `Chercher le résumé de ${todo.length} livre(s) sur Google Books ?`;
+  if (!confirm(msg)) return;
+
+  summariesRunning = true;
+  const btn = document.getElementById('summaries-btn');
+  btn.disabled = true;
+  let done = 0, found = 0, failed = 0, lastErr = '';
+  const queue = todo.slice();
+  const worker = async () => {
+    while (queue.length) {
+      const book = queue.shift();
+      try { if (await loadSummary(book)) found++; }
+      catch (e) { failed++; lastErr = e.message; console.error('Résumé', book.title, e); }
+      done++;
+      rerenderCard(book);
+      showBanner(`Recherche des résumés… <b>${done}/${todo.length}</b> (${found} trouvés)`, Math.round(done / todo.length * 100));
+      if (done % 10 === 0) saveProjects();
+    }
+  };
+  showBanner(`Recherche des résumés… <b>0/${todo.length}</b>`, 0);
+  await Promise.all([worker(), worker(), worker()]); // 3 recherches en parallèle
+  saveProjects();
+  summariesRunning = false;
+  btn.disabled = false;
+  if (failed) {
+    showBanner(`❌ ${found} résumés trouvés, ${failed} recherches en erreur. Dernière erreur : ${esc(lastErr)}`, 100);
+  } else {
+    showBanner(`✓ ${found} résumés trouvés sur ${todo.length}`, 100);
+    setTimeout(hideBanner, 3000);
+  }
+}
 
 // ══════════════════════════════════════════
 // PROFILES
@@ -1254,7 +1439,7 @@ async function computeScores() {
   for (const p of selectedProfiles) {
     showBanner(`Scoring profil <b>${p.nom}</b> (${done+1}/${total})…`, Math.round(done/total*100));
 
-    const list = books.map(b=>`[${b.id}] "${b.title}" par ${b.author||'?'} (${b.category||'?'}) — ${b.summary_court&&b.summary_court!=='EMBARGO'?b.summary_court:'pas de description disponible'}`).join('\n');
+    const list = books.map(b=>`[${b.id}] "${b.title}" par ${b.author||'?'} (${b.category||'?'}) — ${b.summary_status==='ok'?b.summary_court:'pas de description disponible'}`).join('\n');
 
     const prompt = `Tu es un assistant pour libraires. Voici le profil d'un libraire :
 Nom : ${p.nom}
