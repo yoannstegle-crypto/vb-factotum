@@ -687,95 +687,54 @@ async function extractFromPdf(file, projId) {
 
   const b64 = await fileToBase64(file);
 
-  const prompt = `Tu es un assistant expert en librairie. Analyse ce bon de commande PDF et extrais uniquement les livres réels.
+  const prompt = `Tu es un assistant expert en librairie. Analyse ce bon de commande PDF et extrais TOUS les livres réels, de la première à la dernière page.
 
 RÈGLES D'EXCLUSION — ignore complètement ces lignes :
 - Lignes de kits commerciaux (commençant par "KIT ", "COL ", "CPT ", "STP ", "BOX ", "LOT DE ", "COLIS ")
 - Lignes de publicité/PLV (éditeur GALLIMARD PUBLICITE, FOLIO BOITE FOLIO, etc., ou prix = 0,00)
 - En-têtes de section (LITTERATURE, RAPPELS, AJOUTS, SYNERGIE, PLEIADE, etc.)
 - Lignes d'encarts ou affiches (STICKER, AFFICHE, ENCART, KAKEMONO, MARQUE PAGES)
-- Lignes avec auteur "XXX" ou "AAAA"
+- Lignes avec auteur "XXX", "AAAA" ou "KIT"
 - Entrées avec titre en surbrillance bleue/cyan qui ressemblent à des opérations commerciales
 
 INCLURE uniquement : les livres avec un EAN/ISBN réel (13 chiffres), un titre de livre et un auteur lisible.
 
-Pour chaque livre retenu, génère un objet JSON avec ces champs :
-{
-  "isbn": "EAN 13 chiffres sans espaces",
-  "title": "titre complet du livre",
-  "author": "Nom Prénom de l'auteur",
-  "publisher": "maison d'édition",
-  "collection": "nom de la collection si indiqué",
-  "price": 19.00,
-  "date_mev": "JJ/MM/AAAA",
-  "category": "déduis la catégorie parmi : Littérature, Littérature Poche, Policier, Jeunesse, BD, Cuisine, Beaux Arts, Pratique, Autre",
-  "type": "nouveau si nouveauté 2027, reedition si réédition/rappel, catalogue si catalogue expo, inconnu sinon",
-  "summary_court": "EMBARGO",
-  "summary_moyen": "EMBARGO",
-  "summary_long": "EMBARGO"
-}
+FORMAT DE SORTIE — une ligne par livre, 9 champs séparés par " | ", dans cet ordre :
+EAN | TITRE | AUTEUR | ÉDITEUR | COLLECTION | PRIX | DATE_MEV | CAT | TYPE
 
-RÈGLE ABSOLUE SUR LES RÉSUMÉS : Ce PDF est un bon de commande, pas une base bibliographique. Il ne contient PAS de descriptions. Mets TOUJOURS "EMBARGO" pour les trois champs résumé. Ne jamais inventer de résumé.
+- EAN : 13 chiffres sans espaces
+- PRIX : nombre avec un point décimal (ex : 19.50)
+- DATE_MEV : JJ/MM/AAAA
+- COLLECTION : vide si non indiquée (garder les séparateurs)
+- CAT, un code parmi : LIT (Littérature), POCHE (Littérature Poche), POL (Policier), JEU (Jeunesse), BD, CUIS (Cuisine), ART (Beaux Arts), PRAT (Pratique), AUT (Autre)
+- TYPE, un code parmi : N (nouveauté), R (réédition / rappel), C (catalogue d'exposition), I (inconnu)
 
-Réponds UNIQUEMENT avec le tableau JSON, commençant par [ et finissant par ]. Aucun texte avant ou après. Aucun markdown, aucun bloc de code.`;
+Exemple :
+9782070145591 | CONTES ET NOUVELLES | MAUPASSANT GUY | GALLIMARD | QUARTO | 32.00 | 28/01/2027 | LIT | N
+
+Réponds UNIQUEMENT avec ces lignes : pas d'en-tête, pas de numérotation, pas de texte avant ou après, pas de markdown. N'invente rien : pas de résumé, uniquement ce qui figure sur le bon de commande.`;
 
   try {
-    showBanner('Analyse par l\'IA…', 30);
-    showBanner('Envoi à l\'API (<b>peut prendre 30-60 s</b> pour un gros PDF)…', 40);
-    const raw = await callLLM({ userText: prompt, pdfB64: b64, maxTokens: 16000 });
-    showBanner('Traitement des résultats…', 80);
-
-    // Extraction JSON robuste — cherche le premier [ ... ] même si l'IA a ajouté du texte
-    let jsonStr = null;
-    // 1. Essai direct
-    const directMatch = raw.match(/^\s*(\[[\s\S]*\])\s*$/);
-    if (directMatch) jsonStr = directMatch[1];
-    // 2. Cherche le tableau JSON même entouré de texte
-    if (!jsonStr) {
-      const bracketStart = raw.indexOf('[');
-      const bracketEnd = raw.lastIndexOf(']');
-      if (bracketStart !== -1 && bracketEnd > bracketStart) {
-        jsonStr = raw.substring(bracketStart, bracketEnd + 1);
-      }
-    }
-    // 3. Cherche dans un bloc ```json ... ```
-    if (!jsonStr) {
-      const codeMatch = raw.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
-      if (codeMatch) jsonStr = codeMatch[1];
-    }
-    if (!jsonStr) {
-      // Affiche les 300 premiers caractères de la réponse brute pour diagnostic
-      const preview = raw.substring(0, 300).replace(/</g,'&lt;');
-      throw new Error(`Aucun tableau JSON dans la réponse. Début de la réponse reçue :<br><code style="font-size:.7rem;word-break:break-all;">${preview || '(vide)'}</code>`);
-    }
-
-    let books;
-    try {
-      books = JSON.parse(jsonStr);
-    } catch(parseErr) {
-      // 1. Nettoyage caractères de contrôle + virgules traînantes
-      let cleaned = jsonStr.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ').replace(/,\s*([}\]])/g, '$1');
-      try {
-        books = JSON.parse(cleaned);
-      } catch(e2) {
-        // 2. JSON tronqué : fermer les objets/tableaux ouverts
-        // Trouver le dernier objet complet (se termine par })
-        const lastGood = cleaned.lastIndexOf('}');
-        if (lastGood > 0) {
-          let truncated = cleaned.substring(0, lastGood + 1);
-          // Supprimer la virgule éventuelle après le dernier }
-          truncated = truncated.replace(/,\s*$/, '');
-          try {
-            books = JSON.parse('[' + truncated.replace(/^\s*\[/, '') + ']');
-          } catch(e3) {
-            throw new Error(`JSON invalide même après réparation. Erreur : ${e3.message}. Essayez avec Gemini ou relancez l'extraction.`);
-          }
-        } else {
-          throw new Error(`Réponse JSON non parsable : ${parseErr.message}`);
+    showBanner('Envoi à l\'API… (la lecture d\'un gros PDF peut prendre 1 à 3 min)', 10);
+    let lastCount = -1;
+    const { text, truncated } = await callLLMRaw({
+      userText: prompt, pdfB64: b64, maxTokens: 64000,
+      onText: (t) => {
+        const n = (t.match(/\n/g) || []).length;
+        if (n !== lastCount && n % 5 === 0) {
+          lastCount = n;
+          showBanner(`Lecture en cours… <b>${n} titres lus</b>`, Math.min(95, 15 + n / 6));
         }
       }
+    });
+    showBanner('Traitement des résultats…', 96);
+
+    const books = parseBookLines(text, truncated);
+    if (books.length === 0) {
+      const preview = text.substring(0, 300).replace(/</g,'&lt;');
+      throw new Error(`Aucun livre reconnu dans la réponse. Début de la réponse reçue :<br><code style="font-size:.7rem;word-break:break-all;">${preview || '(vide)'}</code>`);
     }
-    if (!Array.isArray(books)) throw new Error('La réponse JSON n\'est pas un tableau.');
+
     const proj = projects.find(p=>p.id===projId);
     if (proj) {
       proj.books = books.map((b, i) => ({
@@ -783,11 +742,16 @@ Réponds UNIQUEMENT avec le tableau JSON, commençant par [ et finissant par ]. 
       }));
       proj.status = 'ready';
       saveProjects();
+      buildCatChips();
       renderBookList();
       updateCounters();
     }
-    showBanner(`✓ ${books.length} titres extraits avec succès`, 100);
-    setTimeout(hideBanner, 2500);
+    if (truncated) {
+      showBanner(`⚠️ Extraction incomplète : la réponse de l'IA a été coupée. ${books.length} titres récupérés — la fin du bon de commande peut manquer.`, 100);
+    } else {
+      showBanner(`✓ ${books.length} titres extraits avec succès`, 100);
+      setTimeout(hideBanner, 2500);
+    }
 
   } catch (e) {
     showBanner('❌ Erreur d\'extraction : ' + e.message, 100);
@@ -799,6 +763,38 @@ Réponds UNIQUEMENT avec le tableau JSON, commençant par [ et finissant par ]. 
       saveProjects();
     }
   }
+}
+
+// Une ligne "EAN | TITRE | AUTEUR | ÉDITEUR | COLLECTION | PRIX | DATE | CAT | TYPE" par livre.
+// Si la réponse a été coupée, la dernière ligne (incomplète) est ignorée.
+function parseBookLines(text, truncated) {
+  const CAT = { LIT:'Littérature', POCHE:'Littérature Poche', POL:'Policier', JEU:'Jeunesse', BD:'BD',
+                CUIS:'Cuisine', ART:'Beaux Arts', PRAT:'Pratique', AUT:'Autre' };
+  const TYP = { N:'nouveau', R:'reedition', C:'catalogue', I:'inconnu' };
+  const lines = text.replace(/```[a-z]*/gi, '').split('\n');
+  if (truncated) lines.pop();
+  const books = [];
+  const seen = new Set();
+  for (const line of lines) {
+    const f = line.split('|').map(s => s.trim());
+    if (f.length < 9) continue;
+    const isbn = f[0].replace(/\D/g, '');
+    if (isbn.length !== 13 || seen.has(isbn)) continue;
+    seen.add(isbn);
+    books.push({
+      isbn,
+      title: f[1],
+      author: f[2],
+      publisher: f[3],
+      collection: f[4],
+      price: parseFloat(f[5].replace(',', '.')) || 0,
+      date_mev: f[6],
+      category: CAT[f[7].toUpperCase()] || 'Autre',
+      type: TYP[f[8].toUpperCase()] || 'inconnu',
+      summary_court: 'EMBARGO', summary_moyen: 'EMBARGO', summary_long: 'EMBARGO'
+    });
+  }
+  return books;
 }
 
 function fileToBase64(file) {
@@ -1160,6 +1156,13 @@ function toggleApiVis() {
 // API CALL
 // ══════════════════════════════════════════
 async function callLLM({ userText, pdfB64, maxTokens }) {
+  return (await callLLMRaw({ userText, pdfB64, maxTokens })).text;
+}
+
+// Renvoie { text, truncated }. Côté Claude, la réponse est reçue en flux (streaming) :
+// pas de délai d'expiration sur les longues réponses, et onText(texteCumulé) permet
+// d'afficher la progression.
+async function callLLMRaw({ userText, pdfB64, maxTokens, onText }) {
   if (!apiKey) throw new Error('Clé API manquante');
 
   if (apiProvider === 'claude') {
@@ -1174,11 +1177,41 @@ async function callLLM({ userText, pdfB64, maxTokens }) {
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true'
       },
-      body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens: maxTokens||4000, messages:[{role:'user',content}] })
+      body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens: maxTokens||4000, stream:true, messages:[{role:'user',content}] })
     });
-    const d = await r.json();
-    if (d.error) throw new Error(d.error.message);
-    return d.content.map(i=>i.text||'').join('');
+    if (!r.ok) {
+      let msg = 'HTTP ' + r.status;
+      try { const d = await r.json(); if (d.error) msg = d.error.message; } catch(_) {}
+      throw new Error(msg);
+    }
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '', text = '', stop = null;
+    const handle = (line) => {
+      if (!line.startsWith('data:')) return;
+      const ev = JSON.parse(line.slice(5));
+      if (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta') {
+        text += ev.delta.text;
+        if (onText) onText(text);
+      } else if (ev.type === 'message_delta' && ev.delta) {
+        stop = ev.delta.stop_reason || stop;
+      } else if (ev.type === 'error') {
+        throw new Error(ev.error && ev.error.message || 'Erreur API');
+      }
+    };
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream:true });
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i).trim();
+        buf = buf.slice(i + 1);
+        handle(line);
+      }
+    }
+    if (buf.trim()) handle(buf.trim());
+    return { text, truncated: stop === 'max_tokens' };
 
   } else {
     const parts = [];
@@ -1192,7 +1225,10 @@ async function callLLM({ userText, pdfB64, maxTokens }) {
     });
     const d = await r.json();
     if (d.error) throw new Error(d.error.message);
-    return (d.candidates[0].content?.parts||[]).map(p=>p.text||'').join('');
+    const cand = d.candidates[0];
+    const text = (cand.content?.parts||[]).map(p=>p.text||'').join('');
+    if (onText) onText(text);
+    return { text, truncated: cand.finishReason === 'MAX_TOKENS' };
   }
 }
 
@@ -1237,7 +1273,7 @@ Réponds UNIQUEMENT en JSON (tableau sans explication) :
 [{"id":"b_0","score":75,"reason":"Correspond aux intérêts artistiques du profil"},...]`;
 
     try {
-      const raw = await callLLM({ userText: prompt, maxTokens: 6000 });
+      const raw = await callLLM({ userText: prompt, maxTokens: 32000 });
       const match = raw.match(/\[[\s\S]*\]/);
       if (match) {
         const arr = JSON.parse(match[0]);
