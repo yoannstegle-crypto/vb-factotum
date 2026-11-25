@@ -48,15 +48,47 @@
   td input[type=number] { width: 72px; padding: 4px 6px; }
   td .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: middle; }
   video { display: none; }
+  .tabs { display: flex; gap: 4px; }
+  .tab { background: transparent; border-color: transparent; color: var(--muted); }
+  .tab.active { background: #2a2f38; border-color: var(--line); color: var(--text); }
+  .hidden { display: none !important; }
+  /* Manuel */
+  #tabManual { display: grid; grid-template-columns: 230px 1fr; gap: 24px; padding: 16px 16px 60px;
+               max-width: 1150px; margin: 0 auto; }
+  @media (max-width: 900px) { #tabManual { grid-template-columns: 1fr; } #toc { position: static !important; } }
+  #toc { position: sticky; top: 12px; align-self: start; background: var(--panel);
+         border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  #toc b { display: block; color: var(--muted); font-size: 12px; text-transform: uppercase;
+           letter-spacing: .05em; margin-bottom: 6px; }
+  #toc a { display: block; color: var(--text); text-decoration: none; padding: 4px 0; font-size: 13px; }
+  #toc a:hover { color: var(--accent); }
+  .manual { min-width: 0; line-height: 1.6; }
+  .manual h2 { font-size: 21px; margin: 34px 0 10px; padding-top: 4px; scroll-margin-top: 12px; }
+  .manual h2:first-child { margin-top: 0; }
+  .manual h3 { font-size: 16px; margin: 20px 0 6px; color: #cfd3d8; }
+  .manual p, .manual li { color: #d4d7db; }
+  .manual a { color: var(--accent); }
+  .manual code { background: #0f1115; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+  .manual table { margin: 10px 0; }
+  .manual th, .manual td { text-align: left; white-space: normal; padding: 6px 8px; }
+  .manual .box { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+                 border-radius: 8px; padding: 10px 14px; margin: 12px 0; }
+  .manual .box.warn { border-left-color: #d29922; }
+  .manual .flow { font-family: ui-monospace, Consolas, monospace; font-size: 13px; overflow-x: auto;
+                  background: #0f1115; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
 </style>
 </head>
 <body>
 <header>
   <h1>🎬 Vidéo → Art-Net → WLED</h1>
+  <nav class="tabs">
+    <button class="tab active" data-tab="tabApp">Application</button>
+    <button class="tab" data-tab="tabManual">📖 Manuel utilisateur</button>
+  </nav>
   <div id="status">Relais : <b id="bridge">?</b> · Envoi : <b id="fps">0</b> img/s</div>
 </header>
 
-<main>
+<main id="tabApp">
   <div>
     <section>
       <h2>Source</h2>
@@ -161,6 +193,246 @@
     </section>
   </div>
 </main>
+
+<div id="tabManual" class="hidden">
+  <nav id="toc">
+    <b>Sommaire</b>
+    <a href="#m-intro">1. Présentation</a>
+    <a href="#m-materiel">2. Matériel nécessaire</a>
+    <a href="#m-install">3. Installation</a>
+    <a href="#m-reseau">4. Réseau Ethernet</a>
+    <a href="#m-wled">5. Réglages WLED</a>
+    <a href="#m-lancer">6. Lancer l'application</a>
+    <a href="#m-dispo">7. Décrire l'installation</a>
+    <a href="#m-mire">8. Vérifier avec la mire</a>
+    <a href="#m-source">9. Choisir une vidéo</a>
+    <a href="#m-cadrage">10. Cadrage et image</a>
+    <a href="#m-save">11. Enregistrer une disposition</a>
+    <a href="#m-alim">12. Débit et alimentation</a>
+    <a href="#m-depannage">13. Dépannage</a>
+  </nav>
+
+  <article class="manual">
+    <h2 id="m-intro">1. Présentation</h2>
+    <p>Cette application affiche une vidéo sur des barres de LEDs pilotées par un contrôleur
+      <b>WLED</b> (par exemple le Gledopto GL-C-618WL). Elle fonctionne avec un fichier vidéo
+      ou avec n'importe quel onglet ou fenêtre de l'ordinateur, comme une vidéo YouTube.</p>
+    <p>Les couleurs sont envoyées en <b>Art-Net</b> par le câble Ethernet (RJ45), environ
+      30 fois par seconde.</p>
+    <div class="flow">Vidéo ─► Page web (calcule la couleur de chaque LED)
+      ─► Relais Python (lancer.bat) ─► câble RJ45, Art-Net ─► Boîtier WLED ─► LEDs</div>
+    <p>Pourquoi un relais ? Un navigateur web ne peut pas envoyer d'Art-Net, qui passe par des
+      paquets UDP. Le petit programme Python fait ce relais. Il n'a besoin d'aucun module
+      supplémentaire.</p>
+
+    <h2 id="m-materiel">2. Matériel nécessaire</h2>
+    <ul>
+      <li>Un ordinateur Windows avec une prise Ethernet (ou un adaptateur USB-Ethernet).</li>
+      <li>Un contrôleur WLED avec Ethernet (Gledopto série « Ethernet »).</li>
+      <li>Des barres ou rubans de LEDs adressables (WS2812B, WS2815, SK6812…).</li>
+      <li>Une alimentation adaptée au nombre de LEDs (voir <a href="#m-alim">§12</a>).</li>
+      <li>Un câble RJ45 entre l'ordinateur et le boîtier.</li>
+      <li>Google Chrome ou Microsoft Edge.</li>
+    </ul>
+
+    <h2 id="m-install">3. Installation (une seule fois)</h2>
+    <ol>
+      <li>Télécharge Python sur <code>python.org/downloads</code> et installe-le.
+        <div class="box warn">Pendant l'installation, coche bien la case
+          <b>« Add python.exe to PATH »</b>.</div></li>
+      <li>Copie le dossier <code>artnet-video</code> où tu veux sur l'ordinateur. Il contient
+        <code>index.html</code>, <code>artnet_bridge.py</code> et <code>lancer.bat</code>.</li>
+    </ol>
+
+    <h2 id="m-reseau">4. Réseau Ethernet</h2>
+    <p>Si le boîtier est branché directement sur l'ordinateur, sans box ni switch, personne
+      ne distribue les adresses IP. Il faut donc des <b>adresses fixes</b> :</p>
+    <table>
+      <tr><th>Appareil</th><th>Adresse IP</th><th>Masque</th></tr>
+      <tr><td>Boîtier WLED</td><td><code>192.168.50.2</code></td><td><code>255.255.255.0</code></td></tr>
+      <tr><td>Ordinateur (carte Ethernet)</td><td><code>192.168.50.1</code></td><td><code>255.255.255.0</code></td></tr>
+    </table>
+    <h3>Sur Windows</h3>
+    <p>Paramètres → Réseau et Internet → Ethernet → Attribution d'adresse IP → Modifier →
+      <b>Manuel</b> → IPv4 activé : adresse <code>192.168.50.1</code>, masque
+      <code>255.255.255.0</code>. Laisse la passerelle et le DNS vides.</p>
+    <h3>Dans WLED</h3>
+    <p>Connecte-toi d'abord au boîtier par son Wi-Fi, puis :</p>
+    <ol>
+      <li>Config → WiFi Setup → <i>Ethernet Type</i> : <b>Gledopto Series With Ethernet</b>.
+        Enregistre, puis redémarre le boîtier.</li>
+      <li>Config → WiFi Setup → <i>Static IP</i> : <code>192.168.50.2</code>,
+        <i>Subnet</i> : <code>255.255.255.0</code>.</li>
+      <li>Avec le câble branché, l'adresse <code>http://192.168.50.2</code> doit s'ouvrir
+        depuis l'ordinateur.</li>
+    </ol>
+    <p>Si le pare-feu Windows le demande au premier lancement, autorise Python sur les
+      réseaux privés.</p>
+
+    <h2 id="m-wled">5. Réglages WLED</h2>
+    <table>
+      <tr><th>Menu</th><th>Réglage</th><th>Valeur</th></tr>
+      <tr><td>LED Preferences</td><td>Nombre de LEDs</td><td>Total de toutes les barres (ex. 5 × 120 = 600)</td></tr>
+      <tr><td>LED Preferences</td><td>Maximum current</td><td>Selon ton alimentation (ex. 80 % de sa capacité)</td></tr>
+      <tr><td>2D Configuration</td><td>Mode</td><td><b>Désactivé (1D)</b></td></tr>
+      <tr><td>Sync Interfaces → Realtime</td><td>Receive UDP realtime</td><td>Coché</td></tr>
+      <tr><td></td><td>Type</td><td><b>Art-Net</b></td></tr>
+      <tr><td></td><td>Start universe</td><td><b>1</b> (le même que dans l'application)</td></tr>
+      <tr><td></td><td>DMX start address</td><td><b>1</b></td></tr>
+      <tr><td></td><td>DMX mode</td><td><b>Multi RGB</b></td></tr>
+      <tr><td></td><td>Timeout</td><td>2500 ms</td></tr>
+    </table>
+    <div class="box"><b>Pourquoi désactiver la 2D ?</b> C'est l'application qui connaît la
+      position de chaque LED. Elle envoie les couleurs directement dans l'ordre du fil.
+      Si la 2D restait active, WLED remettrait les LEDs dans un autre ordre une seconde fois.</div>
+    <p><b>Les univers.</b> Un univers Art-Net transporte 170 LEDs RGB au maximum.
+      L'application découpe les données automatiquement. Par exemple, 600 LEDs = 4 univers
+      (1 à 4). Le nombre d'univers utilisés s'affiche dans le bloc « WLED / Art-Net ».</p>
+
+    <h2 id="m-lancer">6. Lancer l'application</h2>
+    <ol>
+      <li>Double-clique sur <b><code>lancer.bat</code></b>. Une fenêtre noire s'ouvre :
+        c'est le relais, <b>laisse-la ouverte</b>.</li>
+      <li>Le navigateur s'ouvre sur <code>http://localhost:8080</code>. Si ce n'est pas le
+        cas, ouvre cette adresse à la main.</li>
+      <li>En haut à droite, « Relais : <b style="color:var(--ok)">connecté</b> » confirme
+        que la page communique avec le relais.</li>
+      <li>Dans « WLED / Art-Net », vérifie l'<b>IP du WLED</b> et l'<b>univers de départ</b>.</li>
+    </ol>
+    <p>Pour arrêter : bouton « ⏹ Arrêter » (les LEDs s'éteignent), puis ferme la fenêtre noire.</p>
+
+    <h2 id="m-dispo">7. Décrire l'installation</h2>
+    <p>L'application doit savoir <b>où se trouve chaque barre</b> pour que chaque LED prenne la
+      couleur de la vidéo à son emplacement réel. Les barres peuvent être horizontales,
+      verticales, espacées différemment ou en biais.</p>
+    <p>Chaque barre est décrite par :</p>
+    <ul>
+      <li>un <b>point de début</b> : le côté par où <b>arrive le fil de données</b> (● dans
+        l'éditeur) ;</li>
+      <li>un <b>point de fin</b> (■ dans l'éditeur) ;</li>
+      <li>un <b>nombre de LEDs</b>, réparties régulièrement entre ces deux points.</li>
+    </ul>
+    <p>Les positions sont en <b>centimètres, vues de face</b> : X vers la droite, Y vers le
+      haut. <b>L'ordre des barres dans le tableau est l'ordre du fil</b> : la barre 1 reçoit
+      les premières LEDs, la barre 2 les suivantes, etc.</p>
+
+    <h3>a) Le générateur (le plus rapide)</h3>
+    <p>Bloc « Créer une disposition » : indique le nombre de barres, leur longueur, le nombre de
+      LEDs par barre, l'<b>espacement réel</b> entre deux barres, l'orientation, le coin par
+      où le fil arrive et si le câblage fait des allers-retours (serpentin). Clique ensuite
+      sur « Générer ».</p>
+    <div class="box">Exemple : 5 barres horizontales de 2 m, 120 LEDs chacune, espacées de
+      50 cm, fil qui arrive en bas à droite et serpente jusqu'en haut à gauche.</div>
+
+    <h3>b) L'éditeur à la souris</h3>
+    <ul>
+      <li>Fais glisser le <b>●</b> ou le <b>■</b> d'une barre pour déplacer une extrémité.</li>
+      <li>Fais glisser le <b>milieu</b> d'une barre pour la déplacer entière.</li>
+      <li>Les déplacements se font par <b>paliers</b> (10 cm, 25 cm, 50 cm ou 1 m, au choix
+        en haut de l'éditeur). Maintiens <b>Alt</b> pour un placement libre.</li>
+      <li>La flèche au milieu de chaque barre indique le sens du fil.</li>
+      <li>Le cadre bleu en pointillés est la « scène » : la zone cadrée dans la vidéo.
+        Elle s'ajuste automatiquement aux barres.</li>
+    </ul>
+
+    <h3>c) Le tableau (saisie précise)</h3>
+    <ul>
+      <li>Tape les coordonnées en cm et le nombre de LEDs.</li>
+      <li>La colonne « N° LEDs » indique quelles LEDs du fil correspondent à chaque barre.</li>
+      <li><b>▲ ▼</b> changent l'ordre de la barre dans la chaîne, <b>⇄</b> inverse son sens,
+        <b>✕</b> la supprime, « ＋ Ajouter une barre » en crée une nouvelle.</li>
+    </ul>
+
+    <h2 id="m-mire">8. Vérifier avec la mire</h2>
+    <p>Avant de lancer une vidéo, clique sur <b>Mire</b> dans le bloc « Tests ». Chaque barre
+      s'allume dans la couleur de sa pastille du tableau, en dégradé du <b>début (sombre)</b>
+      vers la <b>fin (claire)</b>.</p>
+    <table>
+      <tr><th>Ce que tu vois</th><th>Correction</th></tr>
+      <tr><td>Une barre n'a pas la bonne couleur</td><td>L'ordre est faux : corrige-le avec ▲ ▼</td></tr>
+      <tr><td>Le dégradé d'une barre est à l'envers</td><td>Clique sur ⇄ sur cette barre</td></tr>
+      <tr><td>Une barre est à moitié d'une couleur, à moitié d'une autre</td><td>Le nombre de LEDs de la barre précédente est faux</td></tr>
+      <tr><td>Rien ne s'allume</td><td>Voir <a href="#m-depannage">Dépannage</a></td></tr>
+    </table>
+    <p>Les boutons Rouge, Vert, Bleu et Blanc allument tout de la même couleur. Ils servent à
+      vérifier l'ordre des couleurs (RGB / GRB) réglé dans WLED et l'alimentation.</p>
+
+    <h2 id="m-source">9. Choisir une vidéo</h2>
+    <h3>Fichier vidéo</h3>
+    <p>« 📁 Ouvrir un fichier vidéo » : la vidéo est lue en boucle (formats MP4, WebM…).</p>
+    <h3>YouTube ou n'importe quelle fenêtre</h3>
+    <ol>
+      <li>Ouvre la vidéo YouTube <b>dans une autre fenêtre</b> du navigateur.</li>
+      <li>Clique sur « 📺 Capturer un onglet / une fenêtre » et choisis cet onglet ou cette
+        fenêtre.</li>
+      <li>Lance la lecture, en plein écran si tu veux.</li>
+    </ol>
+    <div class="box warn">Garde la fenêtre de l'application <b>visible</b>, par exemple côte à
+      côte avec la vidéo. Un onglet caché est ralenti par le navigateur.</div>
+
+    <h2 id="m-cadrage">10. Cadrage et image</h2>
+    <p>Dans l'éditeur, la vidéo s'affiche en transparence derrière les barres : tu vois
+      directement quelle partie de l'image tombe sur quelle barre.</p>
+    <table>
+      <tr><th>Réglage</th><th>Effet</th></tr>
+      <tr><td>Zoom</td><td>Agrandit ou réduit la vidéo par rapport à l'installation</td></tr>
+      <tr><td>Décalage horizontal / vertical</td><td>Choisit la partie de la vidéo affichée</td></tr>
+      <tr><td>Épaisseur captée</td><td>Largeur de la bande de vidéo moyennée autour de chaque
+        barre. Si elle est fine, l'image est précise mais peut scintiller. Si elle est large
+        (par exemple l'espace entre deux barres), l'image est plus douce et rien n'est perdu
+        entre les barres.</td></tr>
+      <tr><td>Luminosité</td><td>Puissance des LEDs (60 % par défaut, ce qui ménage l'alimentation)</td></tr>
+      <tr><td>Saturation</td><td>Intensité des couleurs (au-delà de 100 %, couleurs plus vives)</td></tr>
+      <tr><td>Images / seconde</td><td>Nombre d'envois par seconde (30 conseillé)</td></tr>
+    </table>
+    <p>« Recentrer » remet le zoom et les décalages à zéro.</p>
+
+    <h2 id="m-save">11. Enregistrer une disposition</h2>
+    <p>Tous les réglages et la disposition sont <b>mémorisés automatiquement</b> dans le
+      navigateur.</p>
+    <p>Pour garder plusieurs installations ou faire une sauvegarde :
+      « 💾 Enregistrer la disposition » télécharge un fichier
+      <code>disposition-leds.json</code>. « 📂 Charger une disposition » le relit.</p>
+
+    <h2 id="m-alim">12. Débit et alimentation</h2>
+    <h3>Combien de LEDs sur un seul fil ?</h3>
+    <p>Une LED WS2812 met 30 µs à recevoir sa couleur. Avec 600 LEDs sur une broche, il faut
+      environ 18 ms par image, soit environ 54 images/s au maximum. 30 images/s passent donc
+      largement. L'application affiche ce calcul dans le bloc « WLED / Art-Net ». Au-delà de
+      800 à 1000 LEDs par broche, il vaut mieux répartir sur plusieurs sorties.</p>
+    <h3>Alimentation</h3>
+    <ul>
+      <li>Une LED en blanc à fond consomme environ 60 mA. 600 LEDs en 5 V, c'est jusqu'à
+        <b>36 A</b>.</li>
+      <li>Réinjecte l'alimentation (+ et −) à plusieurs endroits, par exemple à chaque
+        barre. Sinon le bout des barres tire vers l'orange et scintille.</li>
+      <li>Règle <i>Maximum current</i> dans WLED pour ne jamais dépasser ton alimentation.</li>
+    </ul>
+
+    <h2 id="m-depannage">13. Dépannage</h2>
+    <table>
+      <tr><th>Problème</th><th>Solution</th></tr>
+      <tr><td>« Relais : injoignable »</td><td>La fenêtre noire de <code>lancer.bat</code> est
+        fermée ou n'a pas démarré. Relance-la. Si Python est introuvable, réinstalle-le en
+        cochant « Add python.exe to PATH ».</td></tr>
+      <tr><td>« Relais : connecté » mais LEDs éteintes</td><td>Vérifie l'IP (WLED doit s'ouvrir
+        sur <code>http://192.168.50.2</code>), le type <b>Art-Net</b> et l'univers de départ
+        dans WLED. Vérifie aussi que le pare-feu Windows autorise Python.</td></tr>
+      <tr><td>Seule une partie des LEDs s'allume</td><td>Le nombre de LEDs dans WLED (LED
+        Preferences) est trop petit, ou l'univers de départ ne correspond pas.</td></tr>
+      <tr><td>Image mélangée, barres dans le désordre</td><td>Désactive la 2D dans WLED, puis
+        vérifie avec la <a href="#m-mire">mire</a>.</td></tr>
+      <tr><td>Couleurs inversées (rouge à la place du vert)</td><td>Change l'ordre des couleurs
+        (GRB / RGB) dans WLED → LED Preferences.</td></tr>
+      <tr><td>Image saccadée</td><td>Garde la page visible, baisse « Images / seconde » à
+        25, ferme les autres onglets lourds.</td></tr>
+      <tr><td>Port 8080 déjà utilisé</td><td>Le relais tourne déjà dans une autre fenêtre :
+        ferme-la ou utilise-la.</td></tr>
+      <tr><td>Écran noir lors de la capture</td><td>Certains sites protégés (Netflix…) bloquent
+        la capture. YouTube fonctionne.</td></tr>
+    </table>
+  </article>
+</div>
 
 <video id="video" playsinline muted></video>
 
@@ -645,6 +917,20 @@ worker.onmessage = tick;
 setInterval(() => { $('fps').textContent = sent; sent = 0; }, 1000);
 fetch('/status').then(r => setBridge(r.ok, r.ok ? 'connecté' : 'erreur'))
                 .catch(() => setBridge(false, 'injoignable (lance lancer.bat)'));
+
+// ---------- Onglets ----------
+function showTab(id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === id));
+  $('tabApp').classList.toggle('hidden', id !== 'tabApp');
+  $('tabManual').classList.toggle('hidden', id !== 'tabManual');
+  history.replaceState(null, '', id === 'tabManual' ? '#manuel' : location.pathname);
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => showTab(t.dataset.tab));
+document.querySelectorAll('#tabManual a[href^="#m-"]').forEach(a => a.onclick = e => {
+  e.preventDefault(); document.querySelector(a.getAttribute('href')).scrollIntoView({ behavior: 'smooth' });
+});
+if (location.hash === '#manuel') showTab('tabManual');
 
 load(); renderTable(); refreshLabels();
 requestAnimationFrame(drawEditor);
