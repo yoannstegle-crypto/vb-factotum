@@ -84,7 +84,7 @@ verticales, espacements différents ou barres en biais sont tous gérés de la m
    barres (la vidéo est affichée en transparence derrière les barres dans l'éditeur).
    *Épaisseur captée* : largeur de la bande de vidéo moyennée autour de chaque barre.
 
-6. **Simulation** : bouton « ✨ Simulation » au-dessus de l'éditeur pour voir le rendu de
+6. **Simulation** : affichée à côté de l'éditeur, elle montre le rendu de
    l'installation à l'écran (⛶ plein écran possible). Décocher « Envoyer aux LEDs » pour
    travailler sans boîtier.
 
