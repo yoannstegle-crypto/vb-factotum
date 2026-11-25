@@ -37,9 +37,10 @@ Si le pare-feu Windows le demande au premier lancement, autoriser Python sur les
 
 ## 3. Réglages WLED
 
-- **Config → LED Preferences** : 480 LEDs (4 × 120), bon type de LED et bonne broche.
-- **Config → 2D Configuration** : *2D Matrix*, 1 panneau, largeur **120**, hauteur **4**,
-  coin de départ et *Serpentine* selon le câblage réel.
+- **Config → LED Preferences** : nombre total de LEDs (ex. 5 barres × 120 = **600**),
+  bon type de LED et bonne broche. *Maximum current* selon l'alimentation.
+- **Config → 2D Configuration** : **désactivé (1D)**. C'est la page web qui connaît la
+  position de chaque LED et envoie les couleurs directement dans l'ordre du fil.
 - **Config → Sync Interfaces → Realtime** :
   - *Receive UDP realtime* : coché
   - *Type* : **Art-Net**
@@ -48,27 +49,39 @@ Si le pare-feu Windows le demande au premier lancement, autoriser Python sur les
   - *DMX mode* : **Multi RGB**
   - *Timeout* : 2500 ms (WLED reprend son effet normal quand on arrête)
 
-480 LEDs = 3 univers : 1 (LEDs 1–170), 2 (171–340), 3 (341–480).
+170 LEDs par univers : 600 LEDs = 4 univers (1 à 4).
 
-## 4. Utilisation
+## 4. Décrire l'installation (disposition des barres)
+
+Chaque barre est un segment : **point de début** (côté où arrive le fil de données),
+**point de fin**, **nombre de LEDs**. Coordonnées en cm, vue de face, X vers la droite,
+Y vers le haut. L'ordre des barres dans le tableau = l'ordre sur le fil.
+
+Chaque LED prend la couleur de la vidéo à sa position réelle : barres horizontales,
+verticales, espacements différents ou barres en biais sont tous gérés de la même façon.
+
+- **Créer une disposition** : génère des barres régulières (nombre, longueur, LEDs,
+  espacement, orientation, coin de départ du fil, serpentin). Par défaut : 5 barres
+  horizontales de 2 m / 120 LEDs, espacées de 50 cm, départ en bas à droite, serpentin.
+- **Éditeur** : glisser les poignées (● début, ■ fin) ou le milieu d'une barre.
+  Déplacement par paliers (10 cm, 25 cm, 50 cm, 1 m) ; **Alt** pour un placement libre.
+- **Tableau** : saisie précise en cm, ▲▼ pour l'ordre, ⇄ pour inverser le sens.
+- **Enregistrer / Charger** : sauvegarde la disposition dans un fichier `.json`.
+
+## 5. Utilisation
 
 1. Double-cliquer sur **`lancer.bat`** → une fenêtre noire s'ouvre (à laisser ouverte),
    puis le navigateur s'ouvre sur http://localhost:8080.
-2. Vérifier l'IP du WLED (`192.168.50.2`), l'univers (1) et la taille (120 × 4).
-3. Cliquer sur **Mire** : ligne 1 rouge, 2 vert, 3 bleu, 4 blanc, dégradé de gauche à droite.
-   - Si c'est bon, tout est en place.
-   - Si une ligne sur deux est à l'envers, active la *Serpentine* dans WLED (2D Configuration)
-     ou coche « Câblage en zigzag » dans la page.
-   - Si l'image est inversée, utilise « Miroir horizontal / vertical ».
+2. Vérifier l'IP du WLED (`192.168.50.2`) et l'univers (1).
+3. Cliquer sur **Mire** : chaque barre s'allume dans sa couleur (pastille du tableau),
+   en dégradé du début (sombre) vers la fin (clair). Si une barre n'a pas la bonne
+   couleur → ordre à corriger (▲▼) ; si le dégradé est à l'envers → ⇄.
 4. Choisir une source :
    - **Fichier vidéo** : « Ouvrir un fichier vidéo ».
    - **YouTube** : ouvrir la vidéo dans une autre fenêtre, cliquer « Capturer un onglet /
-     une fenêtre » et la sélectionner. Mieux vaut que les deux fenêtres soient côte à
-     côte et visibles.
-5. Régler la zone :
-   - « Image entière » : toute la hauteur de la vidéo est écrasée sur les 4 lignes.
-   - « Bande aux vraies proportions » : seule une fine bande horizontale est envoyée
-     (une matrice 120 × 4 est 30 fois plus large que haute) ; « Position verticale »
-     choisit laquelle. Le cadre bleu dans l'aperçu montre la zone envoyée.
+     une fenêtre » et la sélectionner. Garder les deux fenêtres visibles côte à côte.
+5. **Cadrage** : zoom et décalages choisissent quelle partie de la vidéo tombe sur les
+   barres (la vidéo est affichée en transparence derrière les barres dans l'éditeur).
+   *Épaisseur captée* : largeur de la bande de vidéo moyennée autour de chaque barre.
 
 Utiliser Chrome ou Edge (la capture d'onglet y fonctionne le mieux).

@@ -17,29 +17,36 @@
   header h1 { font-size: 17px; margin: 0; }
   #status { margin-left: auto; font-size: 13px; color: var(--muted); }
   #status b.ok { color: var(--ok); } #status b.err { color: var(--err); }
-  main { display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px; }
-  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  main { display: grid; grid-template-columns: 330px 1fr; gap: 16px; padding: 16px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  main > div { min-width: 0; }
   section { background: var(--panel); border: 1px solid var(--line);
             border-radius: 10px; padding: 14px; margin-bottom: 16px; }
   section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em;
                color: var(--muted); margin: 0 0 10px; }
   label { display: flex; align-items: center; justify-content: space-between;
           gap: 10px; margin: 8px 0; }
-  label span.v { color: var(--muted); min-width: 42px; text-align: right; }
+  label span.v { color: var(--muted); min-width: 46px; text-align: right; }
   input[type=text], input[type=number], select {
     background: #0f1115; color: var(--text); border: 1px solid var(--line);
     border-radius: 6px; padding: 6px 8px; width: 150px; font: inherit; }
-  input[type=range] { flex: 1; }
+  input[type=range] { flex: 1; min-width: 0; }
   button { background: #2a2f38; color: var(--text); border: 1px solid var(--line);
            border-radius: 6px; padding: 8px 12px; font: inherit; cursor: pointer; }
   button:hover { border-color: var(--accent); }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   button.danger { background: #3a1d1f; border-color: #6e2b2e; }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+  button.mini { padding: 3px 7px; font-size: 12px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; align-items: center; }
   .hint { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
-  #preview { width: 100%; background: #000; border-radius: 6px; display: block; }
-  #leds { width: 100%; image-rendering: pixelated; background: #000;
-          border-radius: 6px; display: block; margin-top: 8px; }
+  #editor { display: block; max-width: 100%; max-height: 72vh; width: auto; height: auto;
+            margin: 0 auto; background: #000; border-radius: 6px; touch-action: none; }
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { padding: 4px 5px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  td input[type=number] { width: 72px; padding: 4px 6px; }
+  td .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: middle; }
   video { display: none; }
 </style>
 </head>
@@ -53,46 +60,39 @@
   <div>
     <section>
       <h2>Source</h2>
-      <div class="row">
-        <button class="primary" id="btnCapture">📺 Capturer un onglet / une fenêtre</button>
-      </div>
+      <div class="row"><button class="primary" id="btnCapture">📺 Capturer un onglet / une fenêtre</button></div>
       <div class="row">
         <button id="btnFile">📁 Ouvrir un fichier vidéo</button>
         <input type="file" id="file" accept="video/*" hidden>
       </div>
-      <div class="row">
-        <button class="danger" id="btnStop">⏹ Arrêter (LEDs noires)</button>
-      </div>
-      <p class="hint">YouTube : ouvre la vidéo dans un autre onglet ou une autre fenêtre,
-        puis « Capturer » et choisis-la. Garde cette page visible (fenêtre à côté),
-        sinon le navigateur la ralentit.</p>
+      <div class="row"><button class="danger" id="btnStop">⏹ Arrêter (LEDs noires)</button></div>
+      <p class="hint">YouTube : ouvre la vidéo dans une autre fenêtre, puis « Capturer » et
+        choisis-la. Garde cette page visible (fenêtre à côté).</p>
     </section>
 
     <section>
       <h2>WLED / Art-Net</h2>
       <label>IP du WLED <input type="text" id="ip" value="192.168.50.2"></label>
       <label>Univers de départ <input type="number" id="uni" min="0" max="32767" value="1"></label>
-      <label>Largeur (LEDs) <input type="number" id="w" min="1" max="1000" value="120"></label>
-      <label>Hauteur (lignes) <input type="number" id="h" min="1" max="200" value="4"></label>
       <p class="hint" id="uniInfo"></p>
     </section>
 
     <section>
+      <h2>Cadrage de la vidéo</h2>
+      <label>Zoom <input type="range" id="zoom" min="25" max="400" value="100"><span class="v" id="zoomv"></span></label>
+      <label>Décalage horizontal <input type="range" id="panX" min="-50" max="50" value="0"><span class="v" id="panXv"></span></label>
+      <label>Décalage vertical <input type="range" id="panY" min="-50" max="50" value="0"><span class="v" id="panYv"></span></label>
+      <label>Épaisseur captée <input type="range" id="thick" min="0" max="100" value="20"><span class="v" id="thickv"></span></label>
+      <div class="row"><button id="btnRecenter">Recentrer</button></div>
+      <p class="hint">Épaisseur captée : bande de vidéo moyennée de part et d'autre de chaque
+        barre. Plus large = image plus douce, qui « remplit » les espaces entre barres.</p>
+    </section>
+
+    <section>
       <h2>Image</h2>
-      <label>Hauteur de la zone <input type="range" id="zoneH" min="1" max="100" value="100"><span class="v" id="zoneHv"></span></label>
-      <label>Position verticale <input type="range" id="zoneY" min="0" max="100" value="50"><span class="v" id="zoneYv"></span></label>
-      <div class="row">
-        <button id="btnFull">Image entière (écrasée)</button>
-        <button id="btnRatio">Bande aux vraies proportions</button>
-      </div>
       <label>Luminosité <input type="range" id="bri" min="0" max="100" value="60"><span class="v" id="briv"></span></label>
       <label>Saturation <input type="range" id="sat" min="0" max="200" value="120"><span class="v" id="satv"></span></label>
       <label>Images / seconde <input type="range" id="fpsMax" min="5" max="60" value="30"><span class="v" id="fpsMaxv"></span></label>
-      <label>Miroir horizontal <input type="checkbox" id="flipX"></label>
-      <label>Miroir vertical <input type="checkbox" id="flipY"></label>
-      <label>Câblage en zigzag <input type="checkbox" id="zigzag"></label>
-      <p class="hint">Laisse « zigzag » décoché si la matrice 2D est configurée dans WLED.
-        Coche-le seulement si la mire ci-dessous s'affiche mal.</p>
     </section>
 
     <section>
@@ -104,19 +104,60 @@
         <button data-test="white">Blanc</button>
         <button data-test="mire">Mire</button>
       </div>
-      <p class="hint">Mire : ligne 1 rouge, 2 vert, 3 bleu, 4 blanc… avec un dégradé
-        de gauche (sombre) à droite (clair).</p>
+      <p class="hint">Mire : chaque barre a sa couleur (voir le tableau), en dégradé du
+        début (sombre, côté arrivée du fil) vers la fin (clair).</p>
+    </section>
+
+    <section>
+      <h2>Créer une disposition</h2>
+      <label>Nombre de barres <input type="number" id="gN" min="1" max="64" value="5"></label>
+      <label>Longueur (cm) <input type="number" id="gL" min="1" value="200"></label>
+      <label>LEDs par barre <input type="number" id="gLeds" min="1" max="1500" value="120"></label>
+      <label>Espacement (cm) <input type="number" id="gSp" min="0" value="50"></label>
+      <label>Orientation
+        <select id="gOr"><option value="h">Horizontales</option><option value="v">Verticales</option></select></label>
+      <label>Départ du fil
+        <select id="gStart">
+          <option value="br">En bas à droite</option><option value="bl">En bas à gauche</option>
+          <option value="tr">En haut à droite</option><option value="tl">En haut à gauche</option>
+        </select></label>
+      <label>Serpentin (aller-retour) <input type="checkbox" id="gSerp" checked></label>
+      <div class="row"><button class="primary" id="btnGen">Générer (remplace la disposition)</button></div>
     </section>
   </div>
 
   <div>
     <section>
-      <h2>Aperçu de la source (zone envoyée en cadre)</h2>
-      <canvas id="preview" width="960" height="540"></canvas>
+      <h2>Disposition des barres (vue de face)</h2>
+      <div class="row">
+        <label style="margin:0">Palier de déplacement
+          <select id="snap" style="width:100px">
+            <option value="10">10 cm</option><option value="25">25 cm</option>
+            <option value="50" selected>50 cm</option><option value="100">1 m</option>
+          </select></label>
+        <span class="hint" style="margin:0">Glisse les poignées (● début, ■ fin) ou le milieu
+          d'une barre. Maintiens <b>Alt</b> pour ignorer le palier.</span>
+      </div>
+      <canvas id="editor" width="1000" height="600"></canvas>
     </section>
+
     <section>
-      <h2>Aperçu des LEDs</h2>
-      <canvas id="leds"></canvas>
+      <h2>Barres, dans l'ordre du fil de données (cm, Y vers le haut)</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>#</th><th>X début</th><th>Y début</th><th>X fin</th><th>Y fin</th>
+            <th>LEDs</th><th>N° LEDs</th><th></th></tr></thead>
+          <tbody id="bars"></tbody>
+        </table>
+      </div>
+      <div class="row">
+        <button id="btnAdd">＋ Ajouter une barre</button>
+        <button id="btnSave">💾 Enregistrer la disposition</button>
+        <button id="btnLoad">📂 Charger une disposition</button>
+        <input type="file" id="loadFile" accept=".json,application/json" hidden>
+      </div>
+      <p class="hint">Le « début » d'une barre est le côté par où arrive le fil de données.
+        ⇄ inverse le sens, ▲▼ changent l'ordre dans la chaîne.</p>
     </section>
   </div>
 </main>
@@ -126,54 +167,414 @@
 <script>
 const $ = id => document.getElementById(id);
 const video = $('video');
-const preview = $('preview'), pctx = preview.getContext('2d');
-const leds = $('leds'), lctx = leds.getContext('2d');
+const editor = $('editor'), ectx = editor.getContext('2d');
 const work = document.createElement('canvas');
 const wctx = work.getContext('2d', { willReadFrequently: true });
+const WORK_W = 640;
+const MAX_LEDS = 170 * 64;
+const PALETTE = [[255,0,0],[0,255,0],[0,80,255],[255,200,0],[255,0,255],[0,255,255],[255,110,0],[255,255,255]];
 
-const SS = 8;            // sur-échantillonnage : moyenne de 8x8 pixels par LED
-let mode = 'idle';       // idle | video | test
-let testName = null;
-let stream = null;
+let mode = 'idle', testName = null, stream = null;
 let inFlight = false, sent = 0;
+let ledColors = new Float32Array(0);   // couleurs affichées (avant luminosité)
 
-// ---------- Réglages (mémorisés dans le navigateur) ----------
-const fields = ['ip','uni','w','h','zoneH','zoneY','bri','sat','fpsMax','flipX','flipY','zigzag'];
-function loadSettings() {
-  try {
-    const s = JSON.parse(localStorage.getItem('artnet-video') || '{}');
-    for (const k of fields) if (k in s) {
-      const el = $(k); if (el.type === 'checkbox') el.checked = s[k]; else el.value = s[k];
+// ---------- Disposition ----------
+// Coordonnées en cm, X vers la droite, Y vers le haut. La "scène" est le rectangle
+// de l'installation qui est cadré dans la vidéo.
+let layout = { bars: [], stage: { x0: 0, y0: 0, w: 200, h: 200 } };
+
+function generate() {
+  const N = clampInt($('gN').value, 1, 64), L = Math.max(1, +$('gL').value || 200);
+  const n = clampInt($('gLeds').value, 1, 1500), sp = Math.max(0, +$('gSp').value || 0);
+  const start = $('gStart').value, serp = $('gSerp').checked;
+  const bars = [];
+  for (let i = 0; i < N; i++) {
+    const flip = serp && (i & 1);
+    if ($('gOr').value === 'h') {
+      const y = start[0] === 'b' ? i * sp : (N - 1 - i) * sp;
+      const rtl = (start[1] === 'r') !== !!flip;
+      bars.push(rtl ? { x1: L, y1: y, x2: 0, y2: y, n } : { x1: 0, y1: y, x2: L, y2: y, n });
+    } else {
+      const x = start[1] === 'l' ? i * sp : (N - 1 - i) * sp;
+      const up = (start[0] === 'b') !== !!flip;
+      bars.push(up ? { x1: x, y1: 0, x2: x, y2: L, n } : { x1: x, y1: L, x2: x, y2: 0, n });
     }
-  } catch {}
+  }
+  layout.bars = bars;
+  fitStage();
 }
-function saveSettings() {
-  const s = {};
+
+function fitStage() {
+  const b = layout.bars;
+  if (!b.length) { layout.stage = { x0: 0, y0: 0, w: 200, h: 200 }; return; }
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, pitch = 0;
+  for (const r of b) {
+    minX = Math.min(minX, r.x1, r.x2); maxX = Math.max(maxX, r.x1, r.x2);
+    minY = Math.min(minY, r.y1, r.y2); maxY = Math.max(maxY, r.y1, r.y2);
+    pitch = Math.max(pitch, Math.hypot(r.x2 - r.x1, r.y2 - r.y1) / r.n);
+  }
+  // marge = moitié du plus petit écart entre les milieux de deux barres
+  let gap = Infinity;
+  for (let i = 0; i < b.length; i++) for (let j = i + 1; j < b.length; j++) {
+    const d = Math.hypot((b[i].x1 + b[i].x2 - b[j].x1 - b[j].x2) / 2,
+                         (b[i].y1 + b[i].y2 - b[j].y1 - b[j].y2) / 2);
+    if (d > 0.01) gap = Math.min(gap, d);
+  }
+  if (!isFinite(gap)) gap = Math.max(20, pitch * 10);
+  const m = Math.max(gap / 2, pitch);
+  layout.stage = { x0: minX - m, y0: minY - m, w: maxX - minX + 2 * m, h: maxY - minY + 2 * m };
+}
+
+const totalLeds = () => layout.bars.reduce((s, b) => s + b.n, 0);
+const clampInt = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(+v) || lo));
+
+// ---------- Réglages mémorisés ----------
+const fields = ['ip','uni','zoom','panX','panY','thick','bri','sat','fpsMax','snap',
+                'gN','gL','gLeds','gSp','gOr','gStart','gSerp'];
+function save() {
+  const s = { layout };
   for (const k of fields) { const el = $(k); s[k] = el.type === 'checkbox' ? el.checked : el.value; }
-  try { localStorage.setItem('artnet-video', JSON.stringify(s)); } catch {}
+  try { localStorage.setItem('artnet-video-v2', JSON.stringify(s)); } catch {}
 }
+function load() {
+  let s = {};
+  try { s = JSON.parse(localStorage.getItem('artnet-video-v2') || '{}'); } catch {}
+  for (const k of fields) if (k in s) {
+    const el = $(k); if (el.type === 'checkbox') el.checked = s[k]; else el.value = s[k];
+  }
+  const v = validLayout(s.layout);
+  if (v) layout = v; else generate();
+}
+function validLayout(l) {
+  if (!l || !Array.isArray(l.bars) || !l.bars.length || l.bars.length > 64) return null;
+  const bars = [];
+  for (const b of l.bars) {
+    const r = { x1: +b.x1, y1: +b.y1, x2: +b.x2, y2: +b.y2, n: Math.round(+b.n) };
+    if (![r.x1, r.y1, r.x2, r.y2].every(Number.isFinite) || !(r.n >= 1 && r.n <= 1500)) return null;
+    bars.push(r);
+  }
+  if (bars.reduce((s, b) => s + b.n, 0) > MAX_LEDS) return null;
+  const out = { bars, stage: null };
+  const st = l.stage;
+  if (st && [st.x0, st.y0, st.w, st.h].every(Number.isFinite) && st.w > 0 && st.h > 0)
+    out.stage = { x0: st.x0, y0: st.y0, w: st.w, h: st.h };
+  else { const keep = layout; layout = out; fitStage(); layout = keep; }
+  return out;
+}
+
 const cfg = () => ({
   ip: $('ip').value.trim(), uni: +$('uni').value,
-  W: Math.max(1, +$('w').value | 0), H: Math.max(1, +$('h').value | 0),
-  zoneH: +$('zoneH').value / 100, zoneY: +$('zoneY').value / 100,
-  bri: +$('bri').value / 100, sat: +$('sat').value / 100, fps: +$('fpsMax').value,
-  flipX: $('flipX').checked, flipY: $('flipY').checked, zigzag: $('zigzag').checked,
+  zoom: +$('zoom').value / 100, panX: +$('panX').value / 100, panY: +$('panY').value / 100,
+  thick: +$('thick').value, bri: +$('bri').value / 100, sat: +$('sat').value / 100,
+  fps: +$('fpsMax').value, snap: +$('snap').value,
 });
 
 function refreshLabels() {
-  const c = cfg();
-  $('zoneHv').textContent = $('zoneH').value + '%';
-  $('zoneYv').textContent = $('zoneY').value + '%';
+  $('zoomv').textContent = $('zoom').value + '%';
+  $('panXv').textContent = $('panX').value + '%';
+  $('panYv').textContent = $('panY').value + '%';
+  $('thickv').textContent = +$('thick').value ? $('thick').value + ' cm' : 'fine';
   $('briv').textContent = $('bri').value + '%';
   $('satv').textContent = $('sat').value + '%';
   $('fpsMaxv').textContent = $('fpsMax').value;
-  const n = c.W * c.H, u = Math.ceil(n / 170);
-  $('uniInfo').textContent = `${n} LEDs → ${u} univers (${c.uni} à ${c.uni + u - 1}), 170 LEDs max par univers.`;
-  leds.width = c.W; leds.height = c.H;
-  leds.style.aspectRatio = `${c.W} / ${c.H * 3}`;
+  const n = totalLeds(), u = Math.ceil(n / 170), uni = +$('uni').value;
+  const ms = n * 0.03 + 0.3;
+  $('uniInfo').textContent = `${n} LEDs → ${u} univers (${uni} à ${uni + u - 1}). ` +
+    `Sur un seul fil : ~${ms.toFixed(1)} ms par image, ~${Math.floor(1000 / ms)} img/s max (WS2812).`;
 }
-document.querySelectorAll('input').forEach(el =>
-  el.addEventListener('input', () => { refreshLabels(); saveSettings(); }));
+document.querySelectorAll('input, select').forEach(el => {
+  if (el.closest('#bars')) return;
+  el.addEventListener('input', () => { refreshLabels(); save(); });
+});
+
+// ---------- Tableau des barres ----------
+function renderTable() {
+  const tb = $('bars'); tb.innerHTML = '';
+  let first = 1;
+  layout.bars.forEach((b, i) => {
+    const tr = document.createElement('tr');
+    const c = PALETTE[i % PALETTE.length];
+    tr.innerHTML =
+      `<td><span class="sw" style="background:rgb(${c})"></span> ${i + 1}</td>` +
+      ['x1','y1','x2','y2'].map(k => `<td><input type="number" step="1" data-k="${k}" value="${+b[k].toFixed(1)}"></td>`).join('') +
+      `<td><input type="number" min="1" max="1500" data-k="n" value="${b.n}"></td>` +
+      `<td class="hint">${first}–${first + b.n - 1}</td>` +
+      `<td><button class="mini" data-a="up" title="Monter">▲</button>` +
+      `<button class="mini" data-a="down" title="Descendre">▼</button>` +
+      `<button class="mini" data-a="rev" title="Inverser le sens">⇄</button>` +
+      `<button class="mini" data-a="del" title="Supprimer">✕</button></td>`;
+    first += b.n;
+    tr.querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => {
+      const k = inp.dataset.k;
+      if (k === 'n') b.n = clampInt(inp.value, 1, 1500);
+      else if (Number.isFinite(+inp.value)) b[k] = +inp.value;
+      if (totalLeds() > MAX_LEDS) b.n = 1;
+      fitStage(); renderTable(); refreshLabels(); save();
+    }));
+    tr.querySelectorAll('button').forEach(btn => btn.onclick = () => {
+      const a = btn.dataset.a, L = layout.bars;
+      if (a === 'up' && i > 0) [L[i - 1], L[i]] = [L[i], L[i - 1]];
+      if (a === 'down' && i < L.length - 1) [L[i + 1], L[i]] = [L[i], L[i + 1]];
+      if (a === 'rev') [b.x1, b.y1, b.x2, b.y2] = [b.x2, b.y2, b.x1, b.y1];
+      if (a === 'del' && L.length > 1) L.splice(i, 1);
+      fitStage(); renderTable(); refreshLabels(); save();
+    });
+    tb.appendChild(tr);
+  });
+}
+$('btnAdd').onclick = () => {
+  const last = layout.bars[layout.bars.length - 1];
+  const dy = +$('snap').value;
+  const b = last ? { x1: last.x1, y1: last.y1 + dy, x2: last.x2, y2: last.y2 + dy, n: last.n }
+                 : { x1: 0, y1: 0, x2: 200, y2: 0, n: 120 };
+  if (totalLeds() + b.n > MAX_LEDS) return alert('Trop de LEDs (max ' + MAX_LEDS + ').');
+  layout.bars.push(b); fitStage(); renderTable(); refreshLabels(); save();
+};
+$('btnGen').onclick = () => {
+  if (!confirm('Remplacer la disposition actuelle ?')) return;
+  generate(); renderTable(); refreshLabels(); save();
+};
+$('btnSave').onclick = () => {
+  const blob = new Blob([JSON.stringify(layout, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'disposition-leds.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$('btnLoad').onclick = () => $('loadFile').click();
+$('loadFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const v = validLayout(JSON.parse(await f.text()));
+    if (!v) throw new Error();
+    layout = v; renderTable(); refreshLabels(); save();
+  } catch { alert('Fichier de disposition invalide.'); }
+};
+
+// ---------- Correspondance cm <-> pixels de la vidéo ----------
+function videoMap(Wv, Hv, c) {
+  const st = layout.stage;
+  const s = Math.min(Wv / st.w, Hv / st.h) * c.zoom;       // pixels vidéo par cm
+  const cx = st.x0 + st.w / 2, cy = st.y0 + st.h / 2;
+  const ox = Wv / 2 + c.panX * Wv, oy = Hv / 2 + c.panY * Hv;
+  return {
+    s, toV: (x, y) => [ox + (x - cx) * s, oy - (y - cy) * s],
+    fromV: (vx, vy) => [cx + (vx - ox) / s, cy - (vy - oy) / s],
+  };
+}
+
+// Pour chaque LED : liste des pixels (de l'image réduite) à moyenner.
+let sampler = null, samplerKey = '';
+function getSampler(Wv, Hv, c) {
+  const key = JSON.stringify([layout, c.zoom, c.panX, c.panY, c.thick, Wv, Hv]);
+  if (key === samplerKey) return sampler;
+  const WW = WORK_W, HH = Math.max(1, Math.round(WORK_W * Hv / Wv));
+  const m = videoMap(Wv, Hv, c), f = WW / Wv;
+  const cmPerPx = 1 / (m.s * f);
+  const idx = [], offs = [0];
+  for (const b of layout.bars) {
+    const dx = b.x2 - b.x1, dy = b.y2 - b.y1, len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len, px = -uy, py = ux;
+    const pitch = len / b.n, th = Math.max(pitch, c.thick);
+    let na = Math.max(1, Math.ceil(pitch / cmPerPx)), nc = Math.max(1, Math.ceil(th / cmPerPx));
+    if (na * nc > 256) { const k = Math.sqrt(256 / (na * nc)); na = Math.max(1, Math.floor(na * k)); nc = Math.max(1, Math.floor(nc * k)); }
+    for (let i = 0; i < b.n; i++) {
+      const t = (i + 0.5) / b.n, lx = b.x1 + dx * t, ly = b.y1 + dy * t;
+      for (let a = 0; a < na; a++) for (let q = 0; q < nc; q++) {
+        const al = ((a + 0.5) / na - 0.5) * pitch, ac = ((q + 0.5) / nc - 0.5) * th;
+        const [vx, vy] = m.toV(lx + ux * al + px * ac, ly + uy * al + py * ac);
+        const wx = Math.floor(vx * f), wy = Math.floor(vy * f);
+        if (wx >= 0 && wy >= 0 && wx < WW && wy < HH) idx.push((wy * WW + wx) * 4);
+      }
+      offs.push(idx.length);
+    }
+  }
+  sampler = { WW, HH, idx: Int32Array.from(idx), offs: Int32Array.from(offs) };
+  samplerKey = key;
+  return sampler;
+}
+
+function grabVideo(c) {
+  const Wv = video.videoWidth, Hv = video.videoHeight;
+  if (!Wv || !Hv) return null;
+  const sp = getSampler(Wv, Hv, c);
+  if (work.width !== sp.WW || work.height !== sp.HH) { work.width = sp.WW; work.height = sp.HH; }
+  wctx.imageSmoothingEnabled = true; wctx.imageSmoothingQuality = 'high';
+  wctx.drawImage(video, 0, 0, sp.WW, sp.HH);
+  const d = wctx.getImageData(0, 0, sp.WW, sp.HH).data;
+  const N = sp.offs.length - 1, out = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const a = sp.offs[i], z = sp.offs[i + 1];
+    if (z === a) continue;
+    let r = 0, g = 0, b = 0;
+    for (let j = a; j < z; j++) { const p = sp.idx[j]; r += d[p]; g += d[p + 1]; b += d[p + 2]; }
+    const n = z - a; out[i * 3] = r / n; out[i * 3 + 1] = g / n; out[i * 3 + 2] = b / n;
+  }
+  return out;
+}
+
+function testPattern(name) {
+  const out = new Float32Array(totalLeds() * 3);
+  const solid = { red: [255,0,0], green: [0,255,0], blue: [0,0,255], white: [255,255,255], black: [0,0,0] };
+  let k = 0;
+  layout.bars.forEach((b, bi) => {
+    for (let i = 0; i < b.n; i++, k += 3) {
+      let col = solid[name] || solid.black;
+      if (name === 'mire') {
+        const f = 0.05 + 0.95 * i / Math.max(1, b.n - 1);
+        col = PALETTE[bi % PALETTE.length].map(v => v * f);
+      }
+      out[k] = col[0]; out[k + 1] = col[1]; out[k + 2] = col[2];
+    }
+  });
+  return out;
+}
+
+function toPacket(c, px, applyFx) {
+  const n = px.length / 3, buf = new Uint8Array(n * 3);
+  ledColors = new Float32Array(n * 3);
+  for (let i = 0; i < n * 3; i += 3) {
+    let r = px[i], g = px[i + 1], b = px[i + 2];
+    if (applyFx) {
+      const l = 0.299 * r + 0.587 * g + 0.114 * b;
+      r = l + (r - l) * c.sat; g = l + (g - l) * c.sat; b = l + (b - l) * c.sat;
+    }
+    r = Math.max(0, Math.min(255, r)); g = Math.max(0, Math.min(255, g)); b = Math.max(0, Math.min(255, b));
+    ledColors[i] = r; ledColors[i + 1] = g; ledColors[i + 2] = b;
+    buf[i] = r * c.bri; buf[i + 1] = g * c.bri; buf[i + 2] = b * c.bri;
+  }
+  return buf;
+}
+
+// ---------- Éditeur (vue de face, en cm) ----------
+let view = null;   // rectangle visible en cm + échelle
+function computeView() {
+  const st = layout.stage, pad = 0.12 * Math.max(st.w, st.h);
+  const vx0 = st.x0 - pad, vy0 = st.y0 - pad, vw = st.w + 2 * pad, vh = st.h + 2 * pad;
+  const W = 1000, H = Math.max(150, Math.round(W * vh / vw));
+  if (editor.width !== W || editor.height !== H) { editor.width = W; editor.height = H; }
+  const k = Math.min(W / vw, H / vh);
+  view = { vx0, vy0, vw, vh, k,
+    toC: (x, y) => [(x - vx0) * k, (vy0 + vh - y) * k],
+    fromC: (cx, cy) => [vx0 + cx / k, vy0 + vh - cy / k] };
+}
+
+function drawEditor() {
+  computeView();
+  const c = cfg(), k = view.k, W = editor.width, H = editor.height;
+  ectx.fillStyle = '#000'; ectx.fillRect(0, 0, W, H);
+
+  // vidéo projetée derrière l'installation
+  const Wv = video.videoWidth, Hv = video.videoHeight;
+  if (mode === 'video' && Wv && Hv) {
+    const m = videoMap(Wv, Hv, c);
+    const [x0, yTop] = m.fromV(0, 0);
+    const [cx, cy] = view.toC(x0, yTop);
+    ectx.globalAlpha = 0.45;
+    ectx.drawImage(video, cx, cy, Wv / m.s * k, Hv / m.s * k);
+    ectx.globalAlpha = 1;
+  }
+
+  // grille du palier
+  const step = c.snap;
+  ectx.strokeStyle = 'rgba(255,255,255,0.08)'; ectx.lineWidth = 1;
+  ectx.fillStyle = 'rgba(255,255,255,0.35)'; ectx.font = '12px system-ui';
+  for (let x = Math.ceil(view.vx0 / step) * step; x <= view.vx0 + view.vw; x += step) {
+    const [px] = view.toC(x, 0);
+    ectx.beginPath(); ectx.moveTo(px + .5, 0); ectx.lineTo(px + .5, H); ectx.stroke();
+    if (x % 100 === 0) ectx.fillText(x / 100 + ' m', px + 3, H - 4);
+  }
+  for (let y = Math.ceil(view.vy0 / step) * step; y <= view.vy0 + view.vh; y += step) {
+    const [, py] = view.toC(0, y);
+    ectx.beginPath(); ectx.moveTo(0, py + .5); ectx.lineTo(W, py + .5); ectx.stroke();
+    if (y % 100 === 0) ectx.fillText(y / 100 + ' m', 3, py - 3);
+  }
+
+  // cadre de la scène
+  const st = layout.stage;
+  const [sx, sy] = view.toC(st.x0, st.y0 + st.h);
+  ectx.strokeStyle = 'rgba(79,157,255,0.6)'; ectx.setLineDash([6, 6]);
+  ectx.strokeRect(sx, sy, st.w * k, st.h * k); ectx.setLineDash([]);
+
+  // barres et LEDs
+  let li = 0;
+  layout.bars.forEach((b, bi) => {
+    const [ax, ay] = view.toC(b.x1, b.y1), [bx, by] = view.toC(b.x2, b.y2);
+    const col = PALETTE[bi % PALETTE.length];
+    ectx.strokeStyle = `rgba(${col},0.5)`; ectx.lineWidth = 2;
+    ectx.beginPath(); ectx.moveTo(ax, ay); ectx.lineTo(bx, by); ectx.stroke();
+    const len = Math.hypot(bx - ax, by - ay), r = Math.max(1.5, Math.min(5, len / b.n * 0.45));
+    for (let i = 0; i < b.n; i++, li++) {
+      const t = (i + 0.5) / b.n;
+      if (li * 3 + 2 < ledColors.length && mode !== 'idle') {
+        ectx.fillStyle = `rgb(${ledColors[li * 3] | 0},${ledColors[li * 3 + 1] | 0},${ledColors[li * 3 + 2] | 0})`;
+      } else ectx.fillStyle = '#444';
+      ectx.beginPath(); ectx.arc(ax + (bx - ax) * t, ay + (by - ay) * t, r, 0, 7); ectx.fill();
+    }
+    // flèche de sens au milieu
+    const mx = (ax + bx) / 2, my = (ay + by) / 2, ang = Math.atan2(by - ay, bx - ax);
+    ectx.save(); ectx.translate(mx, my); ectx.rotate(ang);
+    ectx.fillStyle = `rgb(${col})`;
+    ectx.beginPath(); ectx.moveTo(9, 0); ectx.lineTo(-6, -7); ectx.lineTo(-6, 7); ectx.fill();
+    ectx.restore();
+    // poignées : début = rond, fin = carré
+    ectx.fillStyle = `rgb(${col})`; ectx.strokeStyle = '#000'; ectx.lineWidth = 2;
+    ectx.beginPath(); ectx.arc(ax, ay, 8, 0, 7); ectx.fill(); ectx.stroke();
+    ectx.fillRect(bx - 7, by - 7, 14, 14); ectx.strokeRect(bx - 7, by - 7, 14, 14);
+    ectx.fillStyle = '#000'; ectx.font = 'bold 11px system-ui'; ectx.textAlign = 'center';
+    ectx.fillText(bi + 1, ax, ay + 4); ectx.textAlign = 'left';
+  });
+  requestAnimationFrame(drawEditor);
+}
+
+// glisser-déposer
+let drag = null;
+function evToCm(e) {
+  const r = editor.getBoundingClientRect();
+  const cx = (e.clientX - r.left) * editor.width / r.width, cy = (e.clientY - r.top) * editor.height / r.height;
+  return { cx, cy, cm: view.fromC(cx, cy), scale: editor.width / r.width };
+}
+function snapV(v, e) { const s = +$('snap').value; return e.altKey ? Math.round(v) : Math.round(v / s) * s; }
+editor.addEventListener('pointerdown', e => {
+  const p = evToCm(e), tol = 12 * p.scale;
+  let best = null;
+  layout.bars.forEach((b, i) => {
+    for (const end of [1, 2]) {
+      const [hx, hy] = view.toC(b['x' + end], b['y' + end]);
+      const d = Math.hypot(hx - p.cx, hy - p.cy);
+      if (d < tol && (!best || d < best.d)) best = { d, i, end };
+    }
+  });
+  if (!best) layout.bars.forEach((b, i) => {
+    const [ax, ay] = view.toC(b.x1, b.y1), [bx, by] = view.toC(b.x2, b.y2);
+    const L2 = (bx - ax) ** 2 + (by - ay) ** 2 || 1;
+    const t = Math.max(0, Math.min(1, ((p.cx - ax) * (bx - ax) + (p.cy - ay) * (by - ay)) / L2));
+    const d = Math.hypot(ax + (bx - ax) * t - p.cx, ay + (by - ay) * t - p.cy);
+    if (d < tol && (!best || d < best.d)) best = { d, i, end: 0 };
+  });
+  if (!best) return;
+  const b = layout.bars[best.i];
+  drag = { ...best, gx: p.cm[0] - b.x1, gy: p.cm[1] - b.y1, dx: b.x2 - b.x1, dy: b.y2 - b.y1 };
+  editor.setPointerCapture(e.pointerId);
+});
+editor.addEventListener('pointermove', e => {
+  const p = evToCm(e);
+  if (!drag) {
+    editor.style.cursor = 'default';
+    return;
+  }
+  const b = layout.bars[drag.i];
+  if (drag.end) {
+    b['x' + drag.end] = snapV(p.cm[0], e); b['y' + drag.end] = snapV(p.cm[1], e);
+  } else {
+    b.x1 = snapV(p.cm[0] - drag.gx, e); b.y1 = snapV(p.cm[1] - drag.gy, e);
+    b.x2 = b.x1 + drag.dx; b.y2 = b.y1 + drag.dy;
+  }
+  renderTable();
+});
+editor.addEventListener('pointerup', () => {
+  if (!drag) return;
+  drag = null; fitStage(); renderTable(); refreshLabels(); save();
+});
 
 // ---------- Sources ----------
 async function stopSource() {
@@ -196,7 +597,7 @@ $('file').onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
   await stopSource();
   video.src = URL.createObjectURL(f);
-  video.loop = true; video.muted = false; video.controls = false;
+  video.loop = true; video.muted = false;
   try { await video.play(); } catch { video.muted = true; await video.play(); }
   mode = 'video';
 };
@@ -204,102 +605,21 @@ $('btnStop').onclick = () => blackout();
 async function blackout() {
   await stopSource();
   mode = 'test'; testName = 'black';
-  pctx.fillStyle = '#000'; pctx.fillRect(0, 0, preview.width, preview.height);
-  // quelques envois noirs pour être sûr, puis repos
   setTimeout(() => { if (testName === 'black') mode = 'idle'; }, 500);
 }
 document.querySelectorAll('[data-test]').forEach(b => b.onclick = async () => {
   await stopSource(); mode = 'test'; testName = b.dataset.test;
 });
-$('btnFull').onclick = () => { $('zoneH').value = 100; $('zoneY').value = 50; refreshLabels(); saveSettings(); };
-$('btnRatio').onclick = () => {
-  const c = cfg();
-  const vw = video.videoWidth || 16, vh = video.videoHeight || 9;
-  const pct = Math.max(1, Math.min(100, Math.round(100 * (vw * c.H / c.W) / vh)));
-  $('zoneH').value = pct; refreshLabels(); saveSettings();
+$('btnRecenter').onclick = () => {
+  $('zoom').value = 100; $('panX').value = 0; $('panY').value = 0; refreshLabels(); save();
 };
 
-// ---------- Capture d'une image -> tableau RGB W*H ----------
-function grabVideo(c) {
-  const vw = video.videoWidth, vh = video.videoHeight;
-  if (!vw || !vh) return null;
-  const sh = Math.max(1, vh * c.zoneH);
-  const sy = (vh - sh) * c.zoneY;
-  const tw = c.W * SS, th = c.H * SS;
-  if (work.width !== tw || work.height !== th) { work.width = tw; work.height = th; }
-  wctx.imageSmoothingEnabled = true; wctx.imageSmoothingQuality = 'high';
-  wctx.drawImage(video, 0, sy, vw, sh, 0, 0, tw, th);
-  const src = wctx.getImageData(0, 0, tw, th).data;
-  const out = new Float32Array(c.W * c.H * 3);
-  for (let y = 0; y < c.H; y++) for (let x = 0; x < c.W; x++) {
-    let r = 0, g = 0, b = 0;
-    for (let j = 0; j < SS; j++) {
-      let p = ((y * SS + j) * tw + x * SS) * 4;
-      for (let i = 0; i < SS; i++, p += 4) { r += src[p]; g += src[p+1]; b += src[p+2]; }
-    }
-    const k = (y * c.W + x) * 3, n = SS * SS;
-    out[k] = r / n; out[k+1] = g / n; out[k+2] = b / n;
-  }
-  // aperçu de la source avec le cadre de la zone
-  const ph = Math.round(preview.width * vh / vw);
-  if (preview.height !== ph) preview.height = ph;
-  pctx.drawImage(video, 0, 0, preview.width, ph);
-  const s = preview.width / vw;
-  pctx.strokeStyle = '#4f9dff'; pctx.lineWidth = 3;
-  pctx.strokeRect(1, sy * s, preview.width - 2, sh * s);
-  return out;
-}
-
-function testPattern(c, name) {
-  const out = new Float32Array(c.W * c.H * 3);
-  const cols = { red: [255,0,0], green: [0,255,0], blue: [0,0,255], white: [255,255,255], black: [0,0,0] };
-  const rows = [[255,0,0],[0,255,0],[0,0,255],[255,255,255]];
-  for (let y = 0; y < c.H; y++) for (let x = 0; x < c.W; x++) {
-    const k = (y * c.W + x) * 3;
-    let col;
-    if (name === 'mire') {
-      const f = 0.05 + 0.95 * x / Math.max(1, c.W - 1);
-      col = rows[y % 4].map(v => v * f);
-    } else col = cols[name] || cols.black;
-    out[k] = col[0]; out[k+1] = col[1]; out[k+2] = col[2];
-  }
-  return out;
-}
-
-// ---------- Réglages couleur + ordre des LEDs ----------
-function toPacket(c, px, applyFx) {
-  const n = c.W * c.H;
-  const buf = new Uint8Array(n * 3);
-  const img = lctx.createImageData(c.W, c.H);
-  for (let y = 0; y < c.H; y++) for (let x = 0; x < c.W; x++) {
-    const sx = c.flipX ? c.W - 1 - x : x, sy = c.flipY ? c.H - 1 - y : y;
-    const s = (sy * c.W + sx) * 3;
-    let r = px[s], g = px[s+1], b = px[s+2];
-    if (applyFx) {
-      const l = 0.299 * r + 0.587 * g + 0.114 * b;
-      r = l + (r - l) * c.sat; g = l + (g - l) * c.sat; b = l + (b - l) * c.sat;
-    }
-    r = Math.max(0, Math.min(255, r * c.bri));
-    g = Math.max(0, Math.min(255, g * c.bri));
-    b = Math.max(0, Math.min(255, b * c.bri));
-    // aperçu (affiché sans la luminosité pour rester lisible)
-    const q = (y * c.W + x) * 4, inv = c.bri > 0 ? 1 / c.bri : 0;
-    img.data[q] = r * inv; img.data[q+1] = g * inv; img.data[q+2] = b * inv; img.data[q+3] = 255;
-    // index physique de la LED
-    const lx = (c.zigzag && (y & 1)) ? c.W - 1 - x : x;
-    const d = (y * c.W + lx) * 3;
-    buf[d] = r; buf[d+1] = g; buf[d+2] = b;
-  }
-  lctx.putImageData(img, 0, 0);
-  return buf;
-}
-
+// ---------- Envoi ----------
 async function send(c, buf) {
-  if (inFlight) return;              // on saute l'image si la précédente n'est pas partie
+  if (inFlight) return;
   inFlight = true;
   try {
-    const r = await fetch(`/frame?ip=${encodeURIComponent(c.ip)}&uni=${c.uni}`,
-                          { method: 'POST', body: buf });
+    const r = await fetch(`/frame?ip=${encodeURIComponent(c.ip)}&uni=${c.uni}`, { method: 'POST', body: buf });
     setBridge(r.ok, r.ok ? 'connecté' : await r.text());
     if (r.ok) sent++;
   } catch { setBridge(false, 'injoignable (lance lancer.bat)'); }
@@ -307,19 +627,18 @@ async function send(c, buf) {
 }
 function setBridge(ok, txt) { const b = $('bridge'); b.textContent = txt; b.className = ok ? 'ok' : 'err'; }
 
-// ---------- Boucle (horloge dans un Worker : pas ralentie si la page est en arrière-plan) ----------
 let last = 0;
 function tick() {
   if (mode === 'idle') return;
-  const c = cfg();
-  const now = performance.now();
+  const c = cfg(), now = performance.now();
   if (now - last < 1000 / c.fps - 2) return;
   last = now;
   let px = null, fx = false;
   if (mode === 'video') { px = grabVideo(c); fx = true; }
-  else if (mode === 'test') px = testPattern(c, testName);
+  else if (mode === 'test') px = testPattern(testName);
   if (px) send(c, toPacket(c, px, fx));
 }
+// horloge dans un Worker : pas ralentie quand la page est en arrière-plan
 const worker = new Worker(URL.createObjectURL(new Blob(
   ['setInterval(() => postMessage(0), 1000 / 120);'], { type: 'text/javascript' })));
 worker.onmessage = tick;
@@ -327,8 +646,8 @@ setInterval(() => { $('fps').textContent = sent; sent = 0; }, 1000);
 fetch('/status').then(r => setBridge(r.ok, r.ok ? 'connecté' : 'erreur'))
                 .catch(() => setBridge(false, 'injoignable (lance lancer.bat)'));
 
-loadSettings(); refreshLabels();
-pctx.fillStyle = '#000'; pctx.fillRect(0, 0, preview.width, preview.height);
+load(); renderTable(); refreshLabels();
+requestAnimationFrame(drawEditor);
 </script>
 </body>
 </html>
