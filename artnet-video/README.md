@@ -84,4 +84,11 @@ verticales, espacements différents ou barres en biais sont tous gérés de la m
    barres (la vidéo est affichée en transparence derrière les barres dans l'éditeur).
    *Épaisseur captée* : largeur de la bande de vidéo moyennée autour de chaque barre.
 
+6. **Simulation** : bouton « ✨ Simulation » au-dessus de l'éditeur pour voir le rendu de
+   l'installation à l'écran (⛶ plein écran possible). Décocher « Envoyer aux LEDs » pour
+   travailler sans boîtier.
+
+Le manuel complet est dans l'application : onglet **📖 Manuel utilisateur**, ou boutons
+**?** à côté de chaque bloc.
+
 Utiliser Chrome ou Edge (la capture d'onglet y fonctionne le mieux).
