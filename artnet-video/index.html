@@ -284,6 +284,15 @@
     <p>Paramètres → Réseau et Internet → Ethernet → Attribution d'adresse IP → Modifier →
       <b>Manuel</b> → IPv4 activé : adresse <code>192.168.50.1</code>, masque
       <code>255.255.255.0</code>. Laisse la passerelle et le DNS vides.</p>
+    <p>Ou, plus rapide : ouvre l'<b>Invite de commandes en administrateur</b> (clic droit →
+      « Exécuter en tant qu'administrateur ») et tape :</p>
+    <div class="flow">netsh interface ipv4 set address name="Ethernet" static 192.168.50.1 255.255.255.0</div>
+    <p>Vérifie ensuite avec <code>ipconfig</code> : la « Carte Ethernet Ethernet » doit afficher
+      <code>192.168.50.1</code>. Le Wi-Fi n'est pas touché, Internet continue de passer par lui.</p>
+    <div class="box warn">Si <code>ipconfig</code> affiche une adresse en <b>169.254.x.x</b>
+      (« Adresse d'autoconfiguration IPv4 »), le câble est bien branché, mais l'ordinateur n'a pas
+      d'adresse fixe. Windows s'est attribué une adresse de secours, qui ne peut pas joindre
+      le boîtier.</div>
     <h3>Dans WLED</h3>
     <p>Connecte-toi d'abord au boîtier par son Wi-Fi, puis :</p>
     <ol>
@@ -472,6 +481,11 @@
       <tr><td>« Relais : injoignable »</td><td>La fenêtre noire de <code>lancer.bat</code> est
         fermée ou n'a pas démarré. Relance-la. Si Python est introuvable, réinstalle-le en
         cochant « Add python.exe to PATH ».</td></tr>
+      <tr><td><code>ipconfig</code> montre 169.254.x.x sur la carte Ethernet</td><td>L'ordinateur
+        n'a pas d'adresse fixe : voir <a href="#m-reseau">§4</a> (commande <code>netsh</code>).</td></tr>
+      <tr><td><code>ping 192.168.50.2</code> ne répond pas</td><td>Vérifie l'adresse fixe du PC,
+        puis dans WLED le <i>Ethernet Type</i> et l'IP fixe. Une fois l'Ethernet actif, WLED coupe
+        son Wi-Fi : on ne le joint plus que par le câble.</td></tr>
       <tr><td>« Relais : connecté » mais LEDs éteintes</td><td>Vérifie l'IP (WLED doit s'ouvrir
         sur <code>http://192.168.50.2</code>), le type <b>Art-Net</b> et l'univers de départ
         dans WLED. Vérifie aussi que le pare-feu Windows autorise Python.</td></tr>
