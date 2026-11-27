@@ -16,24 +16,22 @@ https://www.python.org/downloads/ → installer, en **cochant « Add python.exe 
 
 ## 2. Réseau (câble direct PC ↔ boîtier)
 
-Pas de box, donc adresses fixes :
+Le PC et le boîtier doivent être sur le même réseau. Détails complets dans le manuel
+intégré (onglet Manuel → chapitre 4).
 
-| Appareil | IP | Masque |
-|---|---|---|
-| Boîtier WLED | `192.168.50.2` | `255.255.255.0` |
-| PC (carte Ethernet) | `192.168.50.1` | `255.255.255.0` |
+**A. Sans droits administrateur (conseillé)** : sans box, Windows se donne une adresse
+`169.254.x.x` sur la carte Ethernet (visible avec `ipconfig`). Dans l'application,
+« 🔍 Rechercher les boîtiers » affiche l'adresse à mettre dans WLED, par exemple
+`169.254.134.50`, masque `255.255.0.0`, passerelle `0.0.0.0`. Dans WLED : Config → WiFi
+Setup → *Ethernet Type* « Gledopto Series With Ethernet » + *Static IP* → enregistrer,
+redémarrer, puis relancer la recherche et cliquer sur « Choisir ».
 
-**PC Windows** : Paramètres → Réseau et Internet → Ethernet → Attribution d'adresse IP
-→ Modifier → Manuel → IPv4 : IP `192.168.50.1`, masque `255.255.255.0`
-(passerelle et DNS vides).
+**B. Avec droits administrateur** : PC en `192.168.50.1` / `255.255.255.0`
+(`netsh interface ipv4 set address name="Ethernet" static 192.168.50.1 255.255.255.0`),
+WLED en `192.168.50.2` / `255.255.255.0`.
 
-**WLED** (en le joignant d'abord par son Wi-Fi) :
-- Config → WiFi Setup → *Ethernet Type* : **Gledopto Series With Ethernet** → enregistrer, redémarrer.
-- Config → WiFi Setup → *Static IP* `192.168.50.2`, *Subnet* `255.255.255.0`
-  (*Gateway* `192.168.50.1`).
-- Vérifier : http://192.168.50.2 doit s'ouvrir depuis le PC avec le câble branché.
-
-Si le pare-feu Windows le demande au premier lancement, autoriser Python sur les réseaux privés.
+**C. Via la box ou un routeur** : WLED en adresse automatique, le PC le trouve avec
+« 🔍 Rechercher les boîtiers ».
 
 ## 3. Réglages WLED
 

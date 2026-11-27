@@ -41,6 +41,15 @@
   .hint { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
   .help { margin-left: 6px; width: 20px; height: 20px; padding: 0; border-radius: 50%;
           font-size: 12px; line-height: 18px; text-transform: none; letter-spacing: 0; vertical-align: 1px; }
+  #found { margin-top: 8px; font-size: 13px; }
+  #found .dev { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 6px 0;
+                background: #0f1115; }
+  #found .dev b { color: var(--text); }
+  #found .dev .row { margin: 6px 0 0; }
+  #found .warn { color: #e3b341; }
+  #found .tip { border-left: 3px solid var(--accent); padding: 6px 10px; margin: 8px 0;
+                background: #0f1115; border-radius: 4px; color: #d4d7db; }
+  #found code { background: #000; padding: 1px 5px; border-radius: 4px; user-select: all; }
   .views { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
   @media (max-width: 1250px) { .views { grid-template-columns: 1fr; } }
   .viewhead { display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
@@ -116,6 +125,11 @@
     <section>
       <h2>WLED / Art-Net <button class="help" data-help="m-wled" title="Aide">?</button></h2>
       <label>IP du WLED <input type="text" id="ip" value="192.168.50.2"></label>
+      <div class="row">
+        <button id="btnFind">🔍 Rechercher les boîtiers</button>
+        <button id="btnProbe">Tester cette IP</button>
+      </div>
+      <div id="found"></div>
       <label>Univers de départ <input type="number" id="uni" min="0" max="32767" value="1"></label>
       <label>Envoyer aux LEDs <input type="checkbox" id="sendOn" checked></label>
       <p class="hint" id="uniInfo"></p>
@@ -273,38 +287,72 @@
     </ol>
 
     <h2 id="m-reseau">4. Réseau Ethernet</h2>
-    <p>Si le boîtier est branché directement sur l'ordinateur, sans box ni switch, personne
-      ne distribue les adresses IP. Il faut donc des <b>adresses fixes</b> :</p>
+    <p>L'ordinateur et le boîtier doivent avoir des adresses IP <b>du même réseau</b> pour se
+      parler. Avec un câble direct, il n'y a pas de box pour distribuer les adresses. Choisis
+      la solution qui correspond à ton cas :</p>
+    <table>
+      <tr><th>Ton cas</th><th>Solution</th></tr>
+      <tr><td>Câble direct, <b>sans droits administrateur</b> (PC d'entreprise)</td><td><a href="#m-res-a">A</a> (conseillée)</td></tr>
+      <tr><td>Câble direct, avec droits administrateur</td><td><a href="#m-res-a">A</a> ou <a href="#m-res-b">B</a></td></tr>
+      <tr><td>Boîtier branché sur la box ou un routeur</td><td><a href="#m-res-c">C</a></td></tr>
+    </table>
+
+    <h3 id="m-res-a">A. Câble direct, sans rien changer sur le PC</h3>
+    <p>Sans box, Windows se donne tout seul une adresse « de secours » en <b>169.254.x.x</b>.
+      On règle simplement le boîtier dans cette même plage.</p>
+    <ol>
+      <li>Branche le câble et lance l'application (<code>lancer.bat</code>).</li>
+      <li>Dans le bloc « WLED / Art-Net », clique sur <b>🔍 Rechercher les boîtiers</b>.
+        L'application affiche les adresses du PC et une <b>adresse conseillée</b> pour le boîtier,
+        par exemple <code>169.254.134.50</code>, masque <code>255.255.0.0</code>.</li>
+      <li>Ouvre WLED (par son Wi-Fi, voir l'encadré ci-dessous) → Config → WiFi Setup :
+        <ul>
+          <li><i>Ethernet Type</i> : <b>Gledopto Series With Ethernet</b> ;</li>
+          <li><i>Static IP</i> : l'adresse conseillée ; <i>Subnet mask</i> :
+            <code>255.255.0.0</code> ; <i>Gateway</i> : <code>0.0.0.0</code>.</li>
+        </ul>
+        Enregistre, puis redémarre le boîtier.</li>
+      <li>Relance <b>🔍 Rechercher les boîtiers</b> : le boîtier apparaît. Clique sur <b>Choisir</b>.</li>
+    </ol>
+    <div class="box">Le masque <code>255.255.0.0</code> fait que le boîtier reste joignable même si
+      Windows change un jour son adresse 169.254.x.x.</div>
+
+    <h3 id="m-res-b">B. Câble direct, adresse fixe sur le PC (droits administrateur nécessaires)</h3>
     <table>
       <tr><th>Appareil</th><th>Adresse IP</th><th>Masque</th></tr>
       <tr><td>Boîtier WLED</td><td><code>192.168.50.2</code></td><td><code>255.255.255.0</code></td></tr>
       <tr><td>Ordinateur (carte Ethernet)</td><td><code>192.168.50.1</code></td><td><code>255.255.255.0</code></td></tr>
     </table>
-    <h3>Sur Windows</h3>
-    <p>Paramètres → Réseau et Internet → Ethernet → Attribution d'adresse IP → Modifier →
-      <b>Manuel</b> → IPv4 activé : adresse <code>192.168.50.1</code>, masque
-      <code>255.255.255.0</code>. Laisse la passerelle et le DNS vides.</p>
-    <p>Ou, plus rapide : ouvre l'<b>Invite de commandes en administrateur</b> (clic droit →
-      « Exécuter en tant qu'administrateur ») et tape :</p>
+    <p>Sur le PC : Paramètres → Réseau et Internet → Ethernet → Attribution d'adresse IP →
+      Modifier → <b>Manuel</b>. Ou, dans une Invite de commandes <b>en administrateur</b> :</p>
     <div class="flow">netsh interface ipv4 set address name="Ethernet" static 192.168.50.1 255.255.255.0</div>
-    <p>Vérifie ensuite avec <code>ipconfig</code> : la « Carte Ethernet Ethernet » doit afficher
-      <code>192.168.50.1</code>. Le Wi-Fi n'est pas touché, Internet continue de passer par lui.</p>
-    <div class="box warn">Si <code>ipconfig</code> affiche une adresse en <b>169.254.x.x</b>
-      (« Adresse d'autoconfiguration IPv4 »), le câble est bien branché, mais l'ordinateur n'a pas
-      d'adresse fixe. Windows s'est attribué une adresse de secours, qui ne peut pas joindre
-      le boîtier.</div>
-    <h3>Dans WLED</h3>
-    <p>Connecte-toi d'abord au boîtier par son Wi-Fi, puis :</p>
-    <ol>
-      <li>Config → WiFi Setup → <i>Ethernet Type</i> : <b>Gledopto Series With Ethernet</b>.
-        Enregistre, puis redémarre le boîtier.</li>
-      <li>Config → WiFi Setup → <i>Static IP</i> : <code>192.168.50.2</code>,
-        <i>Subnet</i> : <code>255.255.255.0</code>.</li>
-      <li>Avec le câble branché, l'adresse <code>http://192.168.50.2</code> doit s'ouvrir
-        depuis l'ordinateur.</li>
-    </ol>
-    <p>Si le pare-feu Windows le demande au premier lancement, autorise Python sur les
-      réseaux privés.</p>
+    <p>Le Wi-Fi n'est pas touché : Internet continue de passer par lui.</p>
+
+    <h3 id="m-res-c">C. Boîtier branché sur la box ou un routeur</h3>
+    <p>Laisse WLED en adresse automatique (<i>Static IP</i> à <code>0.0.0.0</code>). La box donne
+      une adresse au boîtier, et le PC (Wi-Fi ou câble sur la même box) le trouve avec
+      <b>🔍 Rechercher les boîtiers</b>. Aucun droit administrateur n'est nécessaire. L'Art-Net
+      passe alors par le Wi-Fi du PC, ce qui peut être un peu moins fluide qu'en câble direct.
+      Pour un spectacle hors de chez toi, un petit routeur de voyage fait le même travail.</p>
+
+    <h3>Vérifier les adresses du PC</h3>
+    <p>Le bouton <b>🔍 Rechercher les boîtiers</b> les affiche (« Ce PC : … »). Tu peux aussi
+      taper <code>ipconfig</code> dans une Invite de commandes.</p>
+    <div class="box warn"><b>Je n'arrive plus à ouvrir la page de WLED.</b> L'IP fixe réglée dans
+      WLED s'applique aussi à son Wi-Fi : sur le Wi-Fi de la maison, le boîtier peut devenir
+      injoignable. Et quand l'Ethernet est actif, WLED coupe en général son Wi-Fi.
+      Solutions :
+      <ul>
+        <li>passe par le câble, avec la solution A ;</li>
+        <li>ou ouvre le point d'accès de secours de WLED. Sur la plupart des contrôleurs, il
+          suffit de maintenir le bouton du boîtier enfoncé environ 6 secondes (pas plus de 10 :
+          au-delà, WLED revient aux réglages d'usine). Connecte-toi ensuite au Wi-Fi
+          <code>WLED-AP</code> (mot de passe <code>wled1234</code>) et ouvre
+          <code>http://4.3.2.1</code>.</li>
+      </ul></div>
+    <p>Si le pare-feu Windows pose une question au premier lancement de Python, réponds
+      « Annuler » si tu n'as pas les droits : l'envoi des LEDs et la recherche fonctionnent
+      quand même.</p>
 
     <h2 id="m-wled">5. Réglages WLED</h2>
     <table>
@@ -481,10 +529,12 @@
       <tr><td>« Relais : injoignable »</td><td>La fenêtre noire de <code>lancer.bat</code> est
         fermée ou n'a pas démarré. Relance-la. Si Python est introuvable, réinstalle-le en
         cochant « Add python.exe to PATH ».</td></tr>
-      <tr><td><code>ipconfig</code> montre 169.254.x.x sur la carte Ethernet</td><td>L'ordinateur
-        n'a pas d'adresse fixe : voir <a href="#m-reseau">§4</a> (commande <code>netsh</code>).</td></tr>
-      <tr><td><code>ping 192.168.50.2</code> ne répond pas</td><td>Vérifie l'adresse fixe du PC,
-        puis dans WLED le <i>Ethernet Type</i> et l'IP fixe. Une fois l'Ethernet actif, WLED coupe
+      <tr><td><code>ipconfig</code> montre 169.254.x.x sur la carte Ethernet</td><td>Normal avec un
+        câble direct. Règle le boîtier en 169.254.x.x : voir <a href="#m-res-a">§4 A</a>
+        (aucun droit administrateur nécessaire).</td></tr>
+      <tr><td><code>ping 192.168.50.2</code> ne répond pas</td><td>Utilise 🔍 Rechercher
+        les boîtiers : le PC et le boîtier doivent être sur le même réseau (§4). Vérifie dans WLED
+        le <i>Ethernet Type</i> et l'IP fixe. Une fois l'Ethernet actif, WLED coupe
         son Wi-Fi : on ne le joint plus que par le câble.</td></tr>
       <tr><td>« Relais : connecté » mais LEDs éteintes</td><td>Vérifie l'IP (WLED doit s'ouvrir
         sur <code>http://192.168.50.2</code>), le type <b>Art-Net</b> et l'univers de départ
@@ -1045,6 +1095,68 @@ worker.onmessage = tick;
 setInterval(() => { $('fps').textContent = sent; sent = 0; }, 1000);
 fetch('/status').then(r => setBridge(r.ok, r.ok ? 'connecté' : 'erreur'))
                 .catch(() => setBridge(false, 'injoignable (lance lancer.bat)'));
+
+
+// ---------- Recherche des boîtiers WLED ----------
+const esc = t => String(t ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+function devHtml(d) {
+  const n = totalLeds();
+  const warn = d.leds != null && d.leds !== n
+    ? `<div class="warn">⚠ Ce boîtier est réglé sur ${d.leds} LEDs, ta disposition en a ${n}
+       (WLED → LED Preferences).</div>` : '';
+  return `<div class="dev"><b>${esc(d.name)}</b> — ${esc(d.ip)}
+    ${d.leds != null ? ' — ' + d.leds + ' LEDs' : ''}${d.ver ? ' — WLED ' + esc(d.ver) : ''}
+    ${warn}
+    <div class="row"><button class="mini primary" data-pick="${esc(d.ip)}">Choisir</button>
+    <a class="mini" href="http://${esc(d.ip)}/" target="_blank" rel="noopener" style="color:var(--accent)">Ouvrir WLED ↗</a></div></div>`;
+}
+function bindPicks() {
+  $('found').querySelectorAll('[data-pick]').forEach(b => b.onclick = () => {
+    $('ip').value = b.dataset.pick; save();
+    b.textContent = '✓ Choisi';
+  });
+}
+$('btnFind').onclick = async () => {
+  const f = $('found'), btn = $('btnFind');
+  btn.disabled = true; f.innerHTML = '<span class="hint">Recherche en cours (5 s environ)…</span>';
+  try {
+    const r = await fetch('/discover?ip=' + encodeURIComponent($('ip').value.trim()));
+    if (!r.ok) throw new Error(await r.text());
+    const res = await r.json();
+    const pcs = res.interfaces.map(i => `${esc(i.name || 'carte')} <code>${esc(i.ip)}</code>`).join(' · ');
+    let h = `<div class="hint">Ce PC : ${pcs || 'aucune carte réseau active'}</div>`;
+    if (res.devices.length) h += res.devices.map(devHtml).join('');
+    else h += `<div class="tip">Aucun boîtier trouvé.</div>`;
+    const sg = res.suggestion;
+    if (sg) h += `<div class="tip">📌 La carte <b>${esc(sg.iface || 'Ethernet')}</b> de ce PC est en
+      <code>${esc(sg.pc_ip)}</code> : adresse automatique (câble direct, sans box).<br>
+      Pour que le boîtier soit joignable <b>sans droits administrateur</b>, règle dans WLED
+      (Config → WiFi Setup → Static IP) :<br>
+      IP <code>${esc(sg.wled_ip)}</code> · masque <code>${esc(sg.mask)}</code> · passerelle <code>0.0.0.0</code><br>
+      puis redémarre le boîtier et relance la recherche.
+      <a href="#" data-help="m-reseau" style="color:var(--accent)">Aide</a></div>`;
+    f.innerHTML = h; bindPicks();
+    f.querySelectorAll('[data-help]').forEach(a => a.onclick = e => {
+      e.preventDefault(); showTab('tabManual');
+      requestAnimationFrame(() => document.getElementById(a.dataset.help).scrollIntoView());
+    });
+  } catch (e) {
+    f.innerHTML = `<div class="tip">Recherche impossible : relais injoignable ou trop ancien.
+      Relance <code>lancer.bat</code>. (${esc(e.message)})</div>`;
+  } finally { btn.disabled = false; }
+};
+$('btnProbe').onclick = async () => {
+  const f = $('found'), ip = $('ip').value.trim();
+  f.innerHTML = '<span class="hint">Test de ' + esc(ip) + '…</span>';
+  try {
+    const r = await fetch('/probe?ip=' + encodeURIComponent(ip));
+    if (!r.ok) throw new Error(await r.text());
+    const d = await r.json();
+    f.innerHTML = d ? devHtml(d) : `<div class="tip">Aucun WLED ne répond en <code>${esc(ip)}</code>.
+      Lance « Rechercher les boîtiers » pour voir les adresses de ce PC.</div>`;
+    bindPicks();
+  } catch (e) { f.innerHTML = `<div class="tip">${esc(e.message)}</div>`; }
+};
 
 // ---------- Onglets ----------
 function showTab(id) {
